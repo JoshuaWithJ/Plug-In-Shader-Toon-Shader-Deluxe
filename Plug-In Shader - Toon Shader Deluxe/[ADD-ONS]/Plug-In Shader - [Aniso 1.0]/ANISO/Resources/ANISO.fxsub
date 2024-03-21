@@ -1,0 +1,220 @@
+////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+// - Plug-In Shader - by Joshua: Aniso Sampler
+// Base Shader: Simple Soft Shader by BeanManP
+// 
+//
+////////////////////////////////////////////////////////////////////////////////////////////////
+//Samplers
+
+// Object Texture
+texture ObjectTexture: MATERIALTEXTURE;
+sampler ObjTexSampler = sampler_state {
+    texture = <ObjectTexture>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Sequence of transformations
+float4x4 WorldViewProjMatrix		: WORLDVIEWPROJECTION;
+float4x4 WorldViewMatrix			: WORLDVIEW;
+float4x4 WorldMatrix				: WORLD;
+
+float3   LightDirection    : DIRECTION < string Object = "Light"; >;
+float3   CameraPosition    : POSITION  < string Object = "Camera"; >;
+
+// Material color
+float4	MaterialDiffuse		: DIFFUSE
+<
+string Object = "Geometry";
+   string UIWidget = "Numeric";
+   bool UIVisible =  true;
+   int UIMin = 0;
+   int UIMax = 1;
+>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+sampler DefSampler : register(s0);
+
+struct BufferShadow_INPUT {
+    float4 Pos      : POSITION; // Position
+    float3 Normal   : NORMAL; // Normal
+	float2 UV : TEXCOORD0;
+};
+
+struct BufferShadow_OUTPUT {
+	float4 Pos 			: POSITION;
+    float3 Normal		: NORMAL; // Normal
+	float2 UV			: TEXCOORD0;
+    float3 Eye			: TEXCOORD3;   // カメラとの相対位置
+	float3 Vertcoord	: TEXCOORD4;   // ###########
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Vertex Shader
+BufferShadow_OUTPUT BufferShadow_VS(BufferShadow_INPUT IN, uniform bool useTexture, uniform bool useSphereMap, uniform bool useToon)
+{
+	BufferShadow_OUTPUT Out = (BufferShadow_OUTPUT)0;
+	// UV
+	Out.UV = IN.UV;
+	
+	// Vertex Normal
+	Out.Normal = normalize( mul( IN.Normal, (float3x3)WorldMatrix ) );
+	
+	// World view projective transformation from camera perspective
+	Out.Pos = mul( IN.Pos, WorldViewProjMatrix );
+	Out.Vertcoord = mul( IN.Pos, WorldMatrix );
+	
+    Out.Eye = CameraPosition - mul( IN.Pos, WorldMatrix );
+	
+	return Out;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////
+float4x4 CTF(float3 frg_position, float3 frg_normal, float2 frg_texcoord) {
+	float4x4 Out;
+	frg_position = frg_position * float3(1, 1, 1);
+	float3 p_dx = ddx(frg_position.xyz);
+	float3 p_dy = ddy(frg_position.xyz);
+	float2 tc_dx = ddx(frg_texcoord.xy);
+	float2 tc_dy = ddy(frg_texcoord.xy);
+	float direction = tc_dx.x * tc_dy.y - tc_dx.y * tc_dy.x > 0.0f ? 1.0f : -1.0f;
+	float3 t = normalize(tc_dy.y * p_dx - tc_dx.y * p_dy);
+	float3 b = normalize( (tc_dy.x * p_dx - tc_dx.x * p_dy) * direction );
+	float3 n = normalize(frg_normal);
+	float3 x = cross(n, t);
+	t = cross(x, n);
+	t = normalize(t);
+	x = cross(b, n);
+	b = cross(n, x);
+	b = normalize(b);
+	
+	Out[0].xyz = t;
+	Out[1].xyz = b;
+	Out[2].xyz = frg_normal;
+	return Out;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Pixel Shader
+float4 BufferShadow_PS(BufferShadow_OUTPUT IN, uniform bool useTexture, uniform bool useSphereMap, uniform bool useToon) : COLOR
+{
+//////////////////////////////////////////////////
+// Inputs
+    float4 Color		= 1;
+	float4 TexColor		= tex2D( ObjTexSampler, IN.UV );
+	
+	Color.a *= normalize(MaterialDiffuse.a * TexColor.a);
+	
+	clip(Color.a < 0.5 ? -1:1);
+
+//////////////////////////////////////////////////
+// Aniso 
+	float4x4 Frame = CTF(IN.Vertcoord, IN.Normal, IN.UV);
+	float2 frg_texcoord = IN.UV;
+	float3 frg_normal = Frame[2].xyz;
+	float3 frg_eye = normalize(IN.Eye);
+	float3 frg_tangent = Frame[0].xyz;
+	float3 frg_binormal = Frame[1].xyz;
+	float3 frg_aniso_tangent;
+	
+	#if Aniso_Direction == 0
+		#define ANISO_1 1
+	#else
+		#define ANISO_1 0
+	#endif
+
+	#if Aniso_Direction == 1
+		#define ANISO_2 1
+	#else
+		#define ANISO_2 0
+	#endif
+
+	#if Aniso_Direction == 2
+		#define ANISO_3 1
+	#else
+		#define ANISO_3 0
+	#endif
+	
+		if (ANISO_3) { // #if ANISO_3_DEF
+            float3 t_normal_w;
+			float3 tangent_w = frg_tangent;
+			float3 binormal_w = frg_binormal;
+            float2 aniso_tmp;
+            aniso_tmp.x = frg_binormal.x;
+            aniso_tmp.y = frg_tangent.y;
+            t_normal_w.x = frg_tangent.z;
+            t_normal_w.y = frg_binormal.z;
+            tangent_w.y = aniso_tmp.x;
+            tangent_w.z = frg_normal.x;
+            binormal_w.x = aniso_tmp.y;
+            binormal_w.z = frg_normal.y;
+            t_normal_w.z = frg_normal.z;
+
+            float3 aniso_tangent;
+            aniso_tangent.xy = frg_texcoord.xy * 2.0 - 1.0;
+            aniso_tangent.z = 0.01;
+            frg_aniso_tangent.x = dot(tangent_w, aniso_tangent);
+            frg_aniso_tangent.y = dot(binormal_w, aniso_tangent);
+            frg_aniso_tangent.z = dot(t_normal_w, aniso_tangent);
+        }
+        else if (ANISO_2) { // #elif ANISO_2_DEF
+            frg_aniso_tangent = frg_binormal;
+        }
+        else if (ANISO_1) { // #elif ANISO_1_DEF
+            frg_aniso_tangent = frg_tangent;
+        } // #endif
+	
+	float4 tmp;
+	float3 normal;
+	#if Use_Normal_Map
+	tmp.xy = tex2D(Normal_S, frg_texcoord.xy).xy * 2.0 - 1.0;
+    tmp.zw = tmp.xy * tmp.xy * tmp.xy;
+    tmp *= float4(NM_Intensity, Flip_Y ? -NM_Intensity : NM_Intensity, 2.0, 2.0);
+    tmp.xy += tmp.w;
+
+    normal = frg_normal.xyz;
+    normal += frg_tangent * tmp.x;
+    normal += frg_binormal * tmp.y;
+    normal = normalize(normal);
+	#else
+	normal = IN.Normal;
+	#endif
+	
+    float3 aniso_tangent = normalize(frg_aniso_tangent);
+    aniso_tangent = normalize(aniso_tangent - dot(aniso_tangent, normal) * normal);
+	
+    tmp.x = dot(aniso_tangent, -LightDirection.xyz);
+    tmp.y = dot(aniso_tangent, frg_eye);
+    tmp.z = -tmp.x;
+    tmp.xyzw = tmp.xyxz * tmp.xyyy + float4(-1.01, -1.01, 0.0, 0.0);
+
+    tmp.xy = -tmp.xy * rsqrt(-tmp.xy);
+    tmp.yz = clamp(tmp.xx * tmp.yy - tmp.zw, 0.0, 1.0);
+	
+    Color.rgb = tmp.xyz;
+	
+//////////////////////////////////////////////////
+        return Color;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Techniques
+// オブジェクト描画用テクニック（PMDモデル用）
+technique MainTecBS4  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = false; bool UseToon = true; > {
+    pass DrawObject {
+
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, false, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, false, true);
+    }
+}
+
+technique MainTecBS5  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = false; bool UseToon = true; > {
+    pass DrawObject {
+
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, false, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, false, true);
+    }
+}

@@ -1,0 +1,346 @@
+////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+// - Plug-In Shader - by Joshua: Hair Reflection Sampler
+// Base Shader: Simple Soft Shader by BeanManP
+// 
+//
+//////////////////////////////////////////////////////////////////////////////////////
+//Samplers
+
+// Object Texture
+texture ObjectTexture: MATERIALTEXTURE;
+sampler ObjTexSampler = sampler_state {
+    texture = <ObjectTexture>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+
+// Sphere Map Texture
+texture ObjectSphereMap <
+	string ResourceName = Spa_Texture
+    >;
+sampler ObjSphareSampler = sampler_state {
+    texture = <ObjectSphereMap>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+
+texture2D HairRenderTarget_2 : OFFSCREENRENDERTARGET
+<
+    string Description = "Hair 2D Reflection Array - 2";
+    float4 ClearColor = { 0, 0, 0, 0 };
+    float ClearDepth = 1.0;
+	int Miplevels = 0;
+	string DefaultEffect = "self = hide;"
+	    "*= Resources/Hair - Base.fx;";
+>;
+sampler2D HairSampler = sampler_state {
+    texture = <HairRenderTarget_2>;
+    MINFILTER = LINEAR;
+    MAGFILTER = LINEAR;
+    MIPFILTER = LINEAR;
+    ADDRESSU  = CLAMP;
+    ADDRESSV  = CLAMP;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Sequence of transformations
+float4x4 WorldViewProjMatrix		: WORLDVIEWPROJECTION;
+float4x4 WorldViewMatrix			: WORLDVIEW;
+float4x4 WorldMatrix				: WORLD;
+float4x4 ViewMatrix					: VIEW;
+float4x4 LightWorldViewProjMatrix	: WORLDVIEWPROJECTION < string Object = "Light"; >;
+
+// Material color
+float4	MaterialDiffuse		: DIFFUSE  < string Object = "Geometry"; >;
+float3	MaterialAmbient		: AMBIENT  < string Object = "Geometry"; >;
+float3	MaterialEmmisive	: EMISSIVE < string Object = "Geometry"; >;
+float3	MaterialSpecular	: SPECULAR < string Object = "Geometry"; >;
+float	SpecularPower		: SPECULARPOWER < string Object = "Geometry"; >;
+float4	MaterialToon		: TOONCOLOR;
+float4	EdgeColor			: EDGECOLOR;
+
+// Light Color
+float3   LightDiffuse      : DIFFUSE   < string Object = "Light"; >;
+float3   LightAmbient      : AMBIENT   < string Object = "Light"; >;
+float3   LightSpecular     : SPECULAR  < string Object = "Light"; >;
+static float4 DiffuseColor  = MaterialDiffuse  * float4(LightDiffuse, 1.0f);
+static float3 AmbientColor  = saturate(MaterialAmbient  * LightAmbient + MaterialEmmisive);
+static float3 SpecularColor = MaterialSpecular * LightSpecular;
+
+float3   LightDirection    : DIRECTION < string Object = "Light"; >;
+float3   CameraPosition    : POSITION  < string Object = "Camera"; >;
+
+bool     parthf;   // Perspective flag
+bool     transp;   // Semi-transparent flag
+bool	 spadd;    // Sphere map additive composition flag
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+sampler DefSampler : register(s0);
+
+struct BufferShadow_INPUT {
+    float4 Pos      : POSITION; // Position
+    float3 Normal   : NORMAL; // Normal
+    float4 Color	: COLOR0;
+	float2 UV		: TEXCOORD0;
+    float4 RTPos	: TEXCOORD5;
+};
+
+struct BufferShadow_OUTPUT {
+	float4 Pos 		: POSITION;
+    float3 Normal   : NORMAL; // Normal
+    float4 Color	: COLOR0;
+	float2 UV		: TEXCOORD0;
+    float4 RTPos	: TEXCOORD5;
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Vertex Shader
+BufferShadow_OUTPUT BufferShadow_VS(BufferShadow_INPUT IN, uniform bool useTexture, uniform bool useSphereMap, uniform bool useToon)
+{
+	BufferShadow_OUTPUT Out = (BufferShadow_OUTPUT)0;
+	// UV
+	Out.UV = IN.UV;
+	
+	// Vertex Normal
+	Out.Normal = normalize( mul( IN.Normal, (float3x3)WorldMatrix ) );
+	
+    Out.Color.rgb = AmbientColor;
+    Out.Color.a = 1;
+    Out.Color = saturate( Out.Color );
+	
+	// World view projective transformation from camera perspective
+	Out.Pos = mul( IN.Pos, WorldViewProjMatrix );
+
+    Out.RTPos = Out.Pos;
+	return Out;
+}
+//////////////////////////////////////////////////
+// Pixel Shader
+float4 BufferShadow_PS(BufferShadow_OUTPUT IN, uniform bool useTexture, uniform bool useSphereMap, uniform bool useToon) : COLOR
+{
+//////////////////////////////////////////////////
+// Inputs
+//////////////////////////////////////////////////
+	float3 Normal		= normalize(IN.Normal);
+//////////////////////////////////////////////////
+
+	float2 sphTex		= mul( Normal, (float3x3)ViewMatrix ).xyz;
+	sphTex.x			= sphTex.x * 0.5f + 0.5f;
+	sphTex.y			= sphTex.y * -0.5f + 0.5f;
+	float4 SPAMap		= tex2D(ObjSphareSampler,sphTex) * 1;
+
+//////////////////////////////////////////////////
+	float4 TexColor		= tex2D( ObjTexSampler, IN.UV );
+    float4 Color		= IN.Color;
+    Color.a				*= MaterialDiffuse;
+    Color				= 0;
+    Color				+= SPAMap;
+    Color.a				+= SPAMap;
+
+	float2 RTPos;
+    RTPos.x				= (IN.RTPos.x / IN.RTPos.w)*0.5+0.5;
+	RTPos.y				= (-IN.RTPos.y / IN.RTPos.w)*0.5+0.5;
+    Color.a				*= tex2D(HairSampler, RTPos);
+	
+    Color.a				*=SPAMap;
+	
+//////////////////////////////////////////////////
+
+        return Color;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Techniques
+technique MainTecBS0  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = false; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, false, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, false, false);
+    }
+}
+
+technique MainTecBS1  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = false; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, false, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, false, false);
+    }
+}
+
+technique MainTecBS2  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = true; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, true, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, true, false);
+    }
+}
+
+technique MainTecBS3  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = true; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, true, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, true, false);
+    }
+}
+
+// オブジェクト描画用テクニック（PMDモデル用）
+technique MainTecBS4  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = false; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, false, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, false, true);
+    }
+}
+
+technique MainTecBS5  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = false; bool UseToon = true; > {
+    pass DrawObject {
+		#if BLEND_APPLY == 1
+		
+		#if SRC_BLEND_TYPE == 0
+		SRCBLEND = ZERO;
+		#endif
+		#if SRC_BLEND_TYPE == 1
+		SRCBLEND = ONE;
+		#endif
+		#if SRC_BLEND_TYPE == 2
+		SRCBLEND = SrcColor;
+		#endif
+		#if SRC_BLEND_TYPE == 3
+		SRCBLEND = INVSrcColor;
+		#endif
+		#if SRC_BLEND_TYPE == 4
+		SRCBLEND = SrcAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 5
+		SRCBLEND = INVSrcAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 6
+		SRCBLEND = DestAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 7
+		SRCBLEND = INVDestAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 8
+		SRCBLEND = DestColor;
+		#endif
+		#if SRC_BLEND_TYPE == 9
+		SRCBLEND = INVDestColor;
+		#endif
+
+		#if DEST_BLEND_TYPE == 0
+		DESTBLEND = ZERO;
+		#endif
+		#if DEST_BLEND_TYPE == 1
+		DESTBLEND = ONE;
+		#endif
+		#if DEST_BLEND_TYPE == 2
+		DESTBLEND = SrcColor;
+		#endif
+		#if DEST_BLEND_TYPE == 3
+		DESTBLEND = INVSrcColor;
+		#endif
+		#if DEST_BLEND_TYPE == 4
+		DESTBLEND = SrcAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 5
+		DESTBLEND = INVSrcAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 6
+		DESTBLEND = DestAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 7
+		DESTBLEND = INVDestAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 8
+		DESTBLEND = DestColor;
+		#endif
+		#if DEST_BLEND_TYPE == 9
+		DESTBLEND = INVDestColor;
+		#endif
+		
+		#endif
+
+		#if ALPHA_BLEND_APPLY == 1
+		
+		#if ALPHA_BLEND_TYPE == 1
+		ALPHABLENDENABLE = FALSE;
+		#endif
+		
+		#if ALPHA_BLEND_TYPE == 2
+		ALPHABLENDENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if ALPHA_TEST_APPLY == 1
+		
+		#if ALPHA_TEST_TYPE == 1
+		ALPHATESTENABLE = FALSE;
+		#endif
+
+		#if ALPHA_TEST_TYPE == 2
+		ALPHATESTENABLE = TRUE;
+		#endif
+
+		#endif
+		
+		#if Z_WRITE_APPLY == 1
+		
+		#if Z_WRITE_TYPE == 1
+		ZWRITEENABLE = FALSE;
+		#endif
+		
+		#if Z_WRITE_TYPE == 2
+		ZWRITEENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if Z_ENABLE_APPLY == 1
+		
+		#if Z_TYPE == 1
+		ZENABLE = FALSE;
+		#endif
+		
+		#if Z_TYPE == 2
+		ZENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if CULLMODE_APPLY == 1
+		
+		#if CULLMODE_TYPE == 0
+		CULLMODE = NONE;
+		#endif
+		
+		#if CULLMODE_TYPE == 1
+		CULLMODE = CW;
+		#endif
+		
+		#if CULLMODE_TYPE == 2
+		CULLMODE = CCW;
+		#endif
+		
+		#endif
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, false, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, false, true);
+    }
+}
+
+technique MainTecBS6  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = true; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, true, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, true, true);
+    }
+}
+
+technique MainTecBS7  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = true; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, true, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, true, true);
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,404 @@
+//////////////////////////////////////////////////////////////////////////////////////
+//
+// - Plug-In Shader - by Joshua
+//   EXTENDED TEXT FORM TUTORIAL
+//
+//////////////////////////////////////////////////////////////////////////////////////
+- GENERAL -
+
+	- YOU HAVE TWO TYPES OF EDITABLE VALUES:
+		1.- Options where they have "#define APPLY_####" are meant to activate or
+			deactivate options. 0 meaning deactivated, 1 meaning activated.
+			
+		2.- Options that have "float" at the start are meant to change the values as
+			you like and wish. YOU ARE ONLY MEANT TO CHANGE VALUES / NUMBERS IN IT,
+			NOT THE CHARACTERS. You can go as high as you want and as low too
+			(Aka. Negative values).
+			
+	- LOAD AND APPLY TEXTURE MAPS:
+		To apply maps / texture is easy. To load a map you need to edit the code for
+		it. it looks this way:
+			"#define ####_Texture "Texture Name.(File Type)";"
+		EX:
+			"#define Animated_Texture "GIF.gif";"
+			
+		You'll only edit the texture name and file type names.
+		In case you want to save the textures and map in a folder the edit you'll need
+		to do is this: (The folder and maps need to be in it beforehand of course)
+			"#define ####_Texture "Folder Name/Texture Name.(File Type)";"
+		EX:
+			"#define Animated_Texture "Maps/GIF.gif";"
+		And that's it.
+//////////////////////////////////////////////////////////////////////////////////////
+- Tone Map:
+
+	Tone Map Helps control the overall colors and brigthness of the model.
+	You have many options to try and change. Tone Map fuctions have the same
+	effects as they will in a image editor. (Exposure, Saturation, Gama).
+	So all values are up to you and your visual needs. For real time editing
+	in MMD you can load the ToneMap controller in your project and it'll allow
+	you edit the scene freely.
+//////////////////////////////////////////////////////////////////////////////////////
+- Shader Type:
+
+	You can choose two shadow rendering styles, Default type (MMD's) and an edit of 
+	Half Lambert for a better shadow rendering. Choose whoever fullfills your needs.
+//////////////////////////////////////////////////////////////////////////////////////
+- Shadow Color:
+
+	As the name says these options affect the color of the shadow.
+	-	"APPLY_SHADER_SHADOW_COLOR" at 0 will use the TOON you applied on the model on
+		PMX Editor.
+	-	"APPLY_SHADER_SHADOW_COLOR" at 1 will use the color you gived on the shader
+		over the "Shadow_Color" option. the way it works is this way:
+		
+		Color Channels:	  Red/Green/Blue/Alpha
+	Shadow_Color = float4(1.0, 1.0, 1.0, 1.0);
+	
+	-	This way you are also able to edit the colors of the shadow without the need
+		of a toon.
+//////////////////////////////////////////////////////////////////////////////////////
+- Texture Brigthness:
+
+	As the name says it allow you change the value of brightness in the model. Apply
+	the value that you like the best. If you are using Tone Map i recommend you a
+	value of "1.5+". It'll help you bring more color easily.
+ 
+- Toon:
+	-	Toon Gradient: This option allow you to change how much the gradient of the
+		shadow takes over the model.
+	-	Toon Smooth: This option allow you to change the smoothness of the zone where
+		the toon is being rendered. Only use values up to "1.0", anything below isn't
+		recommended.
+	-	Toon Intensity: This allows you change the the intensity of the color on the
+		model. The more value you add, the more bright, the less, the darker it gets.
+
+//////////////////////////////////////////////////////////////////////////////////////
+- Toon Mask
+
+	This features allows you to add whatever details you want to add to the Shadow and
+	Reflections. This helps style the model into a more 2D/Cartoon easily and freely
+	either using a pattern or a premade texture.
+	
+	ToonMask_Scale: It allows you to change the scale of the Toon Mask texture of the
+					Shadow.
+	ToonMask_Intensity: It helps you change the intensity of of the Toon Mask texture
+						of the Shadow.
+						
+	ToonMaskReflection_Scale :  It allows you to change the scale of the Toon Mask
+								texture of the Reflections.
+								
+	ToonMaskReflection_Intensity: It helps you change the intensity of of the Toon Mask
+								texture of the Reflections.
+//////////////////////////////////////////////////////////////////////////////////////
+- Edge Line
+
+	NOTE: THE EDGE LINE HAS TO BE ACTIVATED ON MMD.
+
+	Edge Line Color: This option lets you change the color of the edge line.
+					 It works this way:
+						Color Channels:      Red/Green/Blue/Alpha
+					Edge_Line_Color = float4(1.0, 1.0, 1.0, 1.0);
+
+//////////////////////////////////////////////////////////////////////////////////////
+- Animated Texture
+
+	It allows you use a gif/png/etc. texture on the model.
+//////////////////////////////////////////////////////////////////////////////////////
+- Normal Map
+
+	Same setups as before, It allows you use Normal Maps or even an animated one, Again
+	a gif/png/etc.
+	
+	You can also flip the depth of the map in case of you needing it.
+	
+	-	Normal Map Intensity: It allows you change the intensity of the depth on the map.
+//////////////////////////////////////////////////////////////////////////////////////
+- Specular Map
+
+	Same setups as before, It allows you use a Specular Map.
+//////////////////////////////////////////////////////////////////////////////////////
+- Alpha Channel
+
+	This section allows you edit the alpha channel on the texture:
+	-	APPLY ALPHA: Let's you enable the alpha in the texture. (Is very recommended to
+					 keep it enabled.
+	-	APPLY ALPHA CLIP: It allows you control weird alpha rendering by changing the
+						  Values on the "Alpha_Clip" option. Again, you can go as up
+						  and low as you wish but i recommend a "0.5" value.
+	
+
+//////////////////////////////////////////////////////////////////////////////////////
+- Alpha Color Channel
+
+	This option allows you to use a color as the alpha channel. Basic words, erase it
+	and make it transparent. Alpha Color work this way:
+	
+	Color Channels:      Red/Green/Blue
+	Alpha_Color = float3(1.0, 1.0, 1.0);
+	
+	"Alpha_Color_Intensity" Allows you to change the intensity of the effect.
+//////////////////////////////////////////////////////////////////////////////////////
+- Transparency Mask
+
+	Immitating DIVA's thight mesh effect it allows you have an effect of a thigh mesh
+	in your model using the TRANSPARENCY MASK that diva model give you.
+	
+	TRANSPARENCY_COLOR_TYPE 0: The FX will use a pre-made skin color in the effect.
+	TRANSPARENCY_COLOR_TYPE 1: The FX will let you make your own skin color in the
+								"Transparency_Color" color option. It work this way:
+								
+									Color Channels:             Red/Green/Blue
+									Transparency_Color = float3(1.0, 1.0, 1.0);
+
+	Transparency Intensity: It allows you to change how dark the effect is.
+//////////////////////////////////////////////////////////////////////////////////////
+- Alpha Mask
+
+	It allows you use a BLACK AND WHITE texture to indicate where the texture will be
+	transparent. BLACK = Transparent / WHITE = Intact.
+	
+		APPLY_ALPHA_MASK_UV 0 = UV : Original Model UV.
+		APPLY_ALPHA_MASK_UV 1 = UV1: Second UV (Mainly used for AO Maps).
+//////////////////////////////////////////////////////////////////////////////////////
+- Over Transparency
+
+	This option allows you to make Environment Maps, Specular, RimLight/Fresnel, Etc.
+	Not to fade with the alpha. It helps a lot on plastic and glass materials.
+//////////////////////////////////////////////////////////////////////////////////////
+- Specular
+
+	This section affects the specular light. Allowing you to customize it more freely.
+	
+	-	APPLY_SPECULAR 0: Disable the Specular.
+	-	APPLY_SPECULAR 1: Enable the Specular.
+	
+	-	APPLY_SHADER_SPECULAR 0: It'll use the PMX Editor Material values for the
+								 specular.
+	-	APPLY_SHADER_SPECULAR 1: It'll allow you to use the shadow specular values,
+								 Both "Specular_Shininess" and "Specular_Color".
+								 
+			- Specular_Shininess: This options lets allows you to change the size of
+								  the specular. (Only works if APPLY_SHADER_SPECULAR
+								  is in 1)
+			- Specular_Color: This option allows you to change the color of the
+								  specular. (Only works if APPLY_SHADER_SPECULAR
+								  is in 1) It works this way:
+								  
+						Color Channels:     Red/Green/Blue
+					Specular_Color = float4(1.0, 1.0, 1.0, 1.0);
+								  
+								  It only gets affected by the Red, Green and Blue
+								  channels of the "Specular_Color" option.
+								  
+//////////////////////////////////////////////////////////////////////////////////////
+- Aniso
+
+	This option allows you add a Anisotropic / Specular Lighting effect on your model.
+	Only works if APPLY_SPECULAR is in 1. It also only gets affected by the Red, Green
+	and Blue channels of the "Specular_Shininess" option.
+	
+	Aniso Size: It changes the size of the aniso, the more value the smaller it gets.
+				The less value the smallest it gets. 
+				
+	Aniso Pos X/Y: It lets you change the position of the Aniso in the X and Y axis,
+				   This allows you to give a correct look mainly in hairs.
+				   
+	Aniso Back: It lets you make visible the background part of the aniso. it is not
+				recommended to use any value above 0 but you are free to do so.
+				
+	Aniso Softness: It allows you to change the sharpness of the Aniso. You are free
+					To edit it.
+//////////////////////////////////////////////////////////////////////////////////////
+- Environment Maps
+
+
+	APPLY TINT 0: It won't affect the texture and brighten it where the
+				  Environment Maps are.
+				  
+	APPLY TINT 1: It will affect the texture and brighten it where the
+				  Environment Maps are. (Recommended)
+				  
+	APPLY SPA: This option allows you to enable the Spa / Sphere Map.
+	
+	APPLY CUBEMAP: This option allows you to enable the CubeMap.
+	APPLY CUBEMAP LIGHT DIRECTION: This option makes the Cubemap get affected and
+								   rotate with the light direction.
+								   
+	NOTE: ALL ENVIRONMENT MAPS USE THE ALPHA CHANNEL OF THE "Specular_Color" AS
+		  THEIR INTENSITY VALUE:
+
+		  Color Channels:                      /Alpha
+		  Specular_Color = float4(1.0, 1.0, 1.0, 1.0);
+
+//////////////////////////////////////////////////////////////////////////////////////
+- Refraction
+
+	APPLY REFRACTION: It allows you to enable a refraction effect on the model.
+	
+	APPLY REFRACTION REFLECTION 0: It'll use a cubemap as a refraction texture.
+	APPLY REFRACTION REFLECTION 1: It'll use a realtime reflection as a refraction
+								   texture. (No Cubemap needed)
+								   
+	APPLY REFRACTION LIGHT DIRECTION: This option makes the Refraction get affected 
+									  and rotate with the light direction.
+									  (Not needed in normal bases)
+									  
+	APPLY REFRACTION SPECULARMAP: This option allows you use the specular map on the
+								  refraction. (Not needed in normal bases)
+								  
+	Refraction Intensity: This option allows you to change the intensity of the
+						  Refraction.
+
+	Refraction Index: This option allows you change the index value of refraction
+					  Depending on the type of material you are doing. (specific index
+					  values can be found online like "(Material) Refraction Index)".
+					  
+	NOTE: NEXT OPTION ONLY WORK WITH "APPLY REFRACTION REFLECTION" AT 1
+	
+	WIDTH: Widht of the reflection texture.
+	HEIGHT: Height of the reflection texture.
+	APPLY REFRACTION ANTI ALIAS 1: This option applies Antialiasing to the
+								   reflection texture. (Makes it a tad heavier)
+//////////////////////////////////////////////////////////////////////////////////////
+- RimLight/Fresnel
+
+	APPLY RIMLIGHT TYPE 0: This optional disables any type of rim light.
+	APPLY RIMLIGHT TYPE 1: This optional enabled rim light.
+	APPLY RIMLIGHT TYPE 2: This optional enabled Fresnel.
+	APPLY RIMLIGHT TYPE 3: This optional enabled Custom RimLight.
+
+
+	APPLY RIMLIGHT LIGHT DIRECTION: This option allows you have directional
+									for any type of rim light.
+									
+	NOTES:
+	
+	[ ONLY TYPE 1 & 2 ]
+		- RimLight and Fresnel use "Specular_Shininess" as it's size value.
+		
+		- RimLight gets affected by the Red, Green and Blue channels of the
+		  "Specular_Color" option.
+		  
+		- Fresnel gets affected by the Alpha Channel of the "Specular_Color"
+		  option.
+		  
+	[ ONLY TYPE 3 ]
+		Custom RimLight Size:	This option changes the size of the Custom RimLight.
+		Custom RimLight Color:	This option changes the color of the Custom RimLight.
+								It works this way:
+									Color Channels:				   Red/Green/Blue
+									Custom_RimLight_Color = float3(1.0, 1.0, 1.0);
+//////////////////////////////////////////////////////////////////////////////////////
+- SubSurfaceToon
+
+	This option allows have a SubSurfaceToon effect on your model shadows.
+	(recommended on skins only)
+	
+	APPLY SUBSURFACETOON MAP: It allows you use a texture to edit the SubSurfaceToon
+							  And make it appear only where you wish it on.
+							  (Not usable on the filter)
+	
+	NOTE: These Option DO NOT affect the filter.
+	
+	SubSurfaceToon Size: It allows you edit the basic SubSurfaceToon effect size.
+	
+	SubSurfaceToon Bright: It allows you edit the basic SubSurfaceToon effect
+						   Brigthness.
+						   
+	SubSurfaceToon Color: It allows you edit the basic SubSurfaceToon effect color.
+//////////////////////////////////////////////////////////////////////////////////////
+- SubSurfaceToon Filter
+
+	NOTE: The SubSurfaceToon Filter activates automatically once you load the
+		  .x accessory
+
+	APPLY SUBSURFACETOON FILTER SHADOW: This option let you choose use the
+										Uncolored shadow the SubSurfaceToon Filter
+										gives on models that don't have SubSurfaceToon
+										activated. (Not recommended on stages)
+										
+	SubSurfaceToon Saturation: This option allows you to change the saturation of the
+							   SubSurfaceToon Filter. You can change it as you wish.
+//////////////////////////////////////////////////////////////////////////////////////
+- Height Map
+
+	APPLY HEIGHTMAP TYPE 0: This type do not affect the model vertex, it uses a 
+							Parallax / Offset effect instead.
+	
+	APPLY HEIGHTMAP TYPE 1: This type do affect the model vertex, it moves them from
+							their place.
+							
+	HeightMap Scale: This option allows you change the scale of the UV on the
+					 Height Map. (Only works with type 1)
+
+	Height Intensity: This option allows you change the depth of the Height Map.
+					  (Is recommend to not go above "1.0" or "-1.0")
+//////////////////////////////////////////////////////////////////////////////////////
+- Vertex Color
+
+	This option lets you enable Vertex Color which can be important for models and 
+	lots of stages.
+	
+	Vertex Color Intensity: This option lets you change the intensity of the
+						    Vertex Color.
+//////////////////////////////////////////////////////////////////////////////////////
+- Ambient Occlussion
+							   
+		APPLY_AMBIENTOCCLUSSION_UV 0 = UV1: Second UV (Mainly used for AO Maps).
+		APPLY_AMBIENTOCCLUSSION_UV 1 = UV : Original Model UV.
+
+	AMBIENTOCCLUSSION TYPE 0: This type don't affect the model color.
+	
+	AMBIENTOCCLUSSION TYPE 1: This type affect the color of the model by making it
+							  darker where the ambient occlusion is. (Original Use)
+							  
+	AMBIENTOCCLUSSION TYPE 2: This type affect the color of the model by making it
+							  brigther where the ambient occlusion is.
+							  (recommended for light maps)
+//////////////////////////////////////////////////////////////////////////////////////
+- IBL
+
+	This feature allows you to use IBL (Image Based Lighting) on your model which it
+	can be important for more accurate lighting on stages or more detailed lighting.
+	
+	APPLY IBL SPECULAR: This option lets you enable the specular IBL. (Not recommended
+						for hair) Irradiance IBL is needed.
+
+	APPLY IBL LIGHT DIRECTION: This option makes the IBL rotate with the light
+							   direction. (It is highly recommended to use)
+							   
+	IBL Intensity: This option let you change the intensity of the IBL/s.
+	
+	IBL Shadow Intensity: This option let you change the intensity of the IBL on
+						  the shadow.
+						  
+	IBL Brightness: This option let you change the brightness of the IBL/s.
+//////////////////////////////////////////////////////////////////////////////////////
+- Blend Type
+
+	These are options are HIGHLY RECOMMENDED to be used only for experienced users.
+	If you are not experienced on fxs i'll recommend you to avoid them if you don't
+	someone to advice you on them.
+	
+	FOR PROJECT DIVA USERS!:
+	You can also use MikuMikuModel to check: "Source Blend Factor" and
+	"Destination Blend Factor" on the material list. this is what they
+	equal on plug-in:
+	
+	Source Blend Factor = SRC_BLEND_TYPE
+	Destination Blend Factor = DEST_BLEND_TYPE
+	
+//////////////////////////////////////////////////////////////////////////////////////
+ - EYE VARIATION EXCLUSIVE OPTIONS -
+//////////////////////////////////////////////////////////////////////////////////////
+- Eye Mask
+
+	This option mask allows you use a texture on top to detail the eye, for example:
+	Eyes Highlight.
+//////////////////////////////////////////////////////////////////////////////////////
+- Specuñar Pos
+
+	Specular Pos X/Y: Inspired on DIVA, This option allows you move the secondary
+	specular from it's place to add more detail to the eye.
+//////////////////////////////////////////////////////////////////////////////////////

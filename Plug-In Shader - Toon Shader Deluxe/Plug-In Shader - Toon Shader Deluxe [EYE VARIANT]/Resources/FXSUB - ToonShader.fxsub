@@ -1,0 +1,2078 @@
+////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+// - Plug-In Shader - by Joshua: Toon Shader Deluxe
+//   Base Shader: Simple Soft Shader by BeanManP
+// 
+//
+////////////////////////////////////////////////////////////////////////////////////////////////
+//Samplers
+
+// Object Texture
+#if APPLY_ANIMATED_TEXTURE == 0
+texture ObjectTexture: MATERIALTEXTURE;
+sampler ObjTexSampler = sampler_state {
+    texture = <ObjectTexture>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+#if APPLY_ANIMATED_TEXTURE == 1
+texture2D ObjectTexture : ANIMATEDTEXTURE <
+    string ResourceName = Animated_Texture
+>;
+sampler ObjTexSampler = sampler_state {
+    texture = <ObjectTexture>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+#if APPLY_SPA == 1
+// Sphere Map Texture
+texture ObjectSphereMap: MATERIALSPHEREMAP;
+sampler ObjSphareSampler = sampler_state {
+    texture = <ObjectSphereMap>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+#if APPLY_NORMALMAP == 1
+//Normal Map
+#if APPLY_ANIMATED_NORMALMAP == 0
+texture2D NormalMap <
+#endif
+#if APPLY_ANIMATED_NORMALMAP == 1
+texture2D NormalMap : ANIMATEDTEXTURE <
+#endif
+    string ResourceName = NormalMap_Texture
+>;
+sampler NormalMapSampler = sampler_state {
+    texture = <NormalMap>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+#if APPLY_SPECULARMAP == 1
+//Specular Map
+texture2D SpecularMap <
+    string ResourceName = SpecularMap_Texture
+>;
+sampler SpecularMapSampler = sampler_state {
+    texture = <SpecularMap>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+#if APPLY_CUBEMAP == 1
+//Cube Map
+textureCUBE CubeMap <
+    string ResourceName = CubeMap_Texture
+>;
+sampler CubeMapSampler = sampler_state {
+    texture = <CubeMap>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+//Height Map Texture
+#if APPLY_HEIGHTMAP == 1
+
+  texture2D HeightMap
+< string ResourceName = HeightMap_Texture; >;
+	sampler HeightMap_Sampler = sampler_state {
+    texture   = <HeightMap>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+//Transparency Mask
+#if APPLY_TRANSPARENCY == 1
+texture2D TransparencyMask <
+    string ResourceName = Transparency_Texture
+    >;
+sampler Transparency_Sampler = sampler_state {
+    texture   = <TransparencyMask>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+//Alpha Mask
+#if APPLY_ALPHA_MASK == 1
+texture2D AlphaMask <
+    string ResourceName = Alpha_Mask_Texture
+    >;
+sampler Alpha_Mask_Sampler = sampler_state {
+    texture   = <AlphaMask>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+//SubSurfaceToon
+#if APPLY_SUBSURFACETOON == 1
+#if APPLY_SUBSURFACETOON_MAP == 1
+texture2D SubSurfaceToonMap <
+    string ResourceName = SubSurfaceToon_Map_Texture
+    >;
+sampler SubSurfaceToon_Map_Sampler = sampler_state {
+    texture   = <SubSurfaceToonMap>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+#endif
+
+#define SSS_Control  "SSS.x"
+bool SSS_Valid  : CONTROLOBJECT < string name = SSS_Control; >;
+
+//SSS Map
+shared texture2D SSSTex : RENDERCOLORTARGET;
+sampler2D SSS_Samp = sampler_state {
+    texture = <SSSTex>;
+    MinFilter = LINEAR;
+    MagFilter = LINEAR;
+    MipFilter = LINEAR;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+
+#define Aniso_Control  "ANISO.x"
+bool Aniso_Valid  : CONTROLOBJECT < string name = Aniso_Control; >;
+
+//Aniso Map
+shared texture2D AnisoTex : RENDERCOLORTARGET;
+sampler2D Aniso_Samp = sampler_state {
+    texture = <AnisoTex>;
+    MinFilter = LINEAR;
+    MagFilter = LINEAR;
+    MipFilter = LINEAR;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+
+//Refraction Texture
+#if APPLY_REFRACTION == 1
+#if APPLY_REFRACTION_REFLECTION == 0
+textureCUBE Refraction <
+    string ResourceName = Refraction_Texture
+    >;
+sampler Refraction_Sampler = sampler_state {
+    texture = <Refraction>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+#endif
+
+//Reflection Reflection
+
+#if APPLY_REFRACTION == 1
+#if APPLY_REFRACTION_REFLECTION == 1
+texture EnvMapF: OFFSCREENRENDERTARGET <
+    int Width = WIDTH;
+    int Height = HEIGHT;
+    float4 ClearColor = { 0, 0, 0, 1 };
+    float ClearDepth = 1.0;
+	#if ENABLE_REFRACTION_ANTI_ALIAS == 0
+    bool AntiAlias = false;
+	#endif
+	#if ENABLE_REFRACTION_ANTI_ALIAS == 1
+    bool AntiAlias = true;
+	#endif
+    int Miplevels=0;
+>;
+
+sampler sampEnvMapF = sampler_state {
+    texture = <EnvMapF>;
+    MinFilter = LINEAR;
+    MagFilter = LINEAR;
+    MipFilter = LINEAR;
+    AddressU  = CLAMP;
+    AddressV = CLAMP;
+};
+
+texture EnvMapB: OFFSCREENRENDERTARGET <
+    int Width = WIDTH;
+    int Height = HEIGHT;
+    float4 ClearColor = { 0, 0, 0, 1 };
+    float ClearDepth = 1.0;
+	#if ENABLE_REFRACTION_ANTI_ALIAS == 0
+    bool AntiAlias = false;
+	#endif
+	#if ENABLE_REFRACTION_ANTI_ALIAS == 1
+    bool AntiAlias = true;
+	#endif
+    int Miplevels=0;
+>;
+
+sampler sampEnvMapB = sampler_state {
+    texture = <EnvMapB>;
+    MinFilter = LINEAR;
+    MagFilter = LINEAR;
+    MipFilter = LINEAR;
+    AddressU  = CLAMP;
+    AddressV = CLAMP;
+};
+
+float4 texDP(sampler2D sampFront, sampler2D sampBack, float3 vec) {
+    vec = normalize(vec);
+    bool front = (vec.z >= 0);
+    if ( !front ) vec.xz = -vec.xz;
+    
+    float2 uv;
+    uv = vec.xy / (1+vec.z);
+    uv.y = -uv.y;
+    uv = uv * 0.5 + 0.5;
+    
+    float4 ret;
+    if ( front ) {
+        ret = tex2D(sampFront, uv);
+    } else {
+        ret = tex2D(sampBack, uv);
+    }
+    
+    return ret;
+}
+#endif
+#endif
+
+//Ambient Occlussion
+#if APPLY_AMBIENTOCCLUSSION == 1
+texture2D AOMAP <
+    string ResourceName = AmbientOcclussion_Texture
+    >;
+sampler AO_Sampler = sampler_state {
+    texture   = <AOMAP>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+#if APPLY_IBL == 1
+//IBL
+textureCUBE IBLMap  <
+    string ResourceName = IBL_Texture
+    string Format = "A16B16G16R16F";>;
+sampler IBLSampler = sampler_state {
+    Texture = <IBLMap>;
+    MINFILTER = LINEAR;
+    MAGFILTER = LINEAR;
+    MIPFILTER = POINT;
+    ADDRESSU  = CLAMP;
+    ADDRESSV  = CLAMP;
+    ADDRESSW  = CLAMP;
+};
+#endif
+
+#if APPLY_IBL_SPECULAR == 1
+//IBL 2
+textureCUBE IBLMap2  <
+    string ResourceName = IBL_Texture_2
+    string Format = "A16B16G16R16F";>;
+sampler IBLSampler2 = sampler_state {
+    Texture = <IBLMap2>;
+    MINFILTER = LINEAR;
+    MAGFILTER = LINEAR;
+    MIPFILTER = POINT;
+    ADDRESSU  = CLAMP;
+    ADDRESSV  = CLAMP;
+    ADDRESSW  = CLAMP;
+};
+
+//IBL 3
+textureCUBE IBLMap3  <
+    string ResourceName = IBL_Texture_3
+    string Format = "A16B16G16R16F";>;
+sampler IBLSampler3 = sampler_state {
+    Texture = <IBLMap3>;
+    MINFILTER = LINEAR;
+    MAGFILTER = LINEAR;
+    MIPFILTER = POINT;
+    ADDRESSU  = CLAMP;
+    ADDRESSV  = CLAMP;
+    ADDRESSW  = CLAMP;
+};
+#endif
+
+//Toon Mask
+#if APPLY_TOON_MASK == 1
+texture2D ToonMask <
+    string ResourceName = ToonMask_Texture
+    >;
+sampler ToonMask_Sampler = sampler_state {
+    texture   = <ToonMask>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+#if APPLY_TOON_REFLECTION_MASK == 1
+texture2D ToonMaskReflection <
+    string ResourceName = ToonMaskReflection_Texture
+    >;
+sampler ToonMaskReflection_Sampler = sampler_state {
+    texture   = <ToonMaskReflection>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+
+//Eye Mask
+#if APPLY_EYEMASK == 1
+texture2D EyeMask <
+    string ResourceName = EyeMask_Texture
+    >;
+sampler EyeMask_Sampler = sampler_state {
+    texture   = <EyeMask>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+#endif
+
+// This description is to avoid overwriting the original MMD sampler. Cannot be deleted.
+sampler MMDSamp0 : register(s0);
+sampler MMDSamp1 : register(s1);
+sampler MMDSamp2 : register(s2);
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Sequence of transformations
+float4x4 WorldViewProjMatrix		: WORLDVIEWPROJECTION;
+float4x4 WorldViewMatrix			: WORLDVIEW;
+float4x4 WorldMatrix				: WORLD;
+float4x4 ViewMatrix					: VIEW;
+float4x4 LightWorldViewProjMatrix	: WORLDVIEWPROJECTION < string Object = "Light"; >;
+
+float3   LightDirection    : DIRECTION < string Object = "Light"; >;
+float3   CameraPosition    : POSITION  < string Object = "Camera"; >;
+
+// Material color
+float4	MaterialDiffuse		: DIFFUSE  < string Object = "Geometry"; >;
+float3	MaterialAmbient		: AMBIENT  < string Object = "Geometry"; >;
+float3	MaterialEmmisive	: EMISSIVE < string Object = "Geometry"; >;
+float3	MaterialSpecular	: SPECULAR < string Object = "Geometry"; >;
+float	SpecularPower		: SPECULARPOWER < string Object = "Geometry"; >;
+float4	MaterialToon		: TOONCOLOR;
+float4	EdgeColor			: EDGECOLOR;
+
+// Light Color
+float3   LightDiffuse      : DIFFUSE   < string Object = "Light"; >;
+float3   LightAmbient      : AMBIENT   < string Object = "Light"; >;
+float3   LightSpecular     : SPECULAR  < string Object = "Light"; >;
+static float4 DiffuseColor  = MaterialDiffuse  * float4(LightDiffuse, 1.0f);
+static float3 AmbientColor  = saturate(MaterialAmbient  * LightAmbient + MaterialEmmisive);
+static float3 SpecularColor = MaterialSpecular * LightSpecular;
+
+bool     parthf;   // Perspective flag
+bool     transp;   // Semi-transparent flag
+bool	 spadd;    // Sphere map additive composition flag
+
+#define SKII1	1500
+#define SKII2	8000
+#define Toon	Toon_Gradient
+
+//HG Shadow
+#include "Resources/HgShadow_ObjHeader.fxh"
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+//NormalMap
+	#if APPLY_NORMALMAP == 1
+float3x3 compute_tangent_frame(float3 Normal, float3 View, float2 UV)
+{
+  float3 dp1  = ddx(View);
+  float3 dp2  = ddy(View);
+  float2 duv1 = ddx(UV);
+  float2 duv2 = ddy(UV);
+
+  float3x3 M = float3x3(dp1, dp2, cross(dp1, dp2));
+  float2x3 inverseM = float2x3(cross(M[1], M[2]), cross(M[2], M[0]));
+   #if FLIP_NORMALMAP == 0
+  float3 Tangent = mul(float2(duv1.x, duv2.x), inverseM)* -1;
+  #endif
+  #if FLIP_NORMALMAP == 1
+  float3 Tangent = mul(float2(duv1.x, duv2.x), inverseM)* 1;
+  #endif
+  float3 Binormal = mul(float2(duv1.y, duv2.y), inverseM);
+
+  return float3x3(normalize(Tangent), normalize(Binormal), Normal);
+}
+	#endif
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Edge Line
+
+struct BufferEdge_OUTPUT {
+    float4 Pos      : POSITION;
+	float3 Normal   : TEXCOORD2;
+};
+
+BufferEdge_OUTPUT ColorRender_VS(float4 Pos : POSITION, float3 Normal : NORMAL)
+{
+	BufferEdge_OUTPUT Out = (BufferEdge_OUTPUT)0;
+	
+	Out.Pos = mul( Pos, WorldViewProjMatrix );
+	
+	Out.Pos.xyz += Out.Normal;
+	Out.Pos.xyz *= 0.01 + 1;
+	
+    return Out;
+}
+// Pixel Shader
+float4 ColorRender_PS() : COLOR
+{
+    // Edge Line Color
+	float4 EdgeColor = Edge_Line_Color;
+    return EdgeColor;
+}
+
+// Techniques
+technique EdgeTec < string MMDPass = "edge"; > {
+	pass DrawEdge {
+        VertexShader = compile vs_2_0 ColorRender_VS();
+        PixelShader  = compile ps_2_0 ColorRender_PS();
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+sampler DefSampler : register(s0);
+
+struct BufferShadow_INPUT {
+    float4 Pos      : POSITION; // Position
+    float3 Normal   : NORMAL; // Normal
+    float3 Binormal	: BINORMAL; // Binormal
+    float3 Tangent	: TANGENT; // Tangent
+    float2 UV		: TEXCOORD0; // UV
+    float2 UV1		: TEXCOORD1; // AO Map
+	#if APPLY_VERTEXCOLOR == 1
+    float4 UV2		: TEXCOORD2; // Vertex Color
+	#endif
+};
+
+struct BufferShadow_OUTPUT {
+	float4 Pos : POSITION;
+    float3 Normal   : NORMAL; // Normal
+    float4 Color    : COLOR0; // Texture
+	float2 UV : TEXCOORD0;
+	float2 UV1 : TEXCOORD1;
+	#if APPLY_VERTEXCOLOR == 1
+	float4 UV2 : TEXCOORD2;
+	#endif
+    float3 Eye      : TEXCOORD4; // Eye
+    float4 ZCalcTex : TEXCOORD5; // ZCalcTex
+    float4 PPos		: TEXCOORD8; // Positon for HgShadow
+	#if APPLY_HEIGHTMAP == 1
+	#if APPLY_HEIGHTMAP_TYPE == 0
+	float4 PosWorld : TEXCOORD7;
+	#endif
+	#endif
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Vertex Shader
+BufferShadow_OUTPUT BufferShadow_VS(BufferShadow_INPUT IN, uniform bool useTexture, uniform bool useSphereMap, uniform bool useToon)
+{
+	BufferShadow_OUTPUT Out = (BufferShadow_OUTPUT)0;
+    
+	// TEX
+	Out.UV = IN.UV;
+	Out.UV1 = IN.UV1;
+	#if APPLY_VERTEXCOLOR == 1
+	Out.UV2 = IN.UV2;
+	#endif
+	
+	// Relative to the camera position
+	Out.Eye = CameraPosition - mul( IN.Pos, WorldMatrix );	
+
+	// Vertex Normal
+	Out.Normal = normalize( mul( IN.Normal, (float3x3)WorldMatrix ) );
+	
+	// Shadow Projection
+	Out.ZCalcTex = mul( IN.Pos, LightWorldViewProjMatrix );
+	
+	// Diffuse color + ambient color calculation
+	Out.Color.rgb = AmbientColor;
+	
+	if ( !useToon ) {
+        Out.Color.rgb += max(0,dot( IN.Normal, -LightDirection )) * DiffuseColor.rgb;
+	}
+	
+	Out.Color.a = DiffuseColor.a;
+	Out.Color = saturate( Out.Color );
+	
+	// World view projective transformation from camera perspective
+	Out.Pos = mul( IN.Pos, WorldViewProjMatrix );
+
+	#if APPLY_HEIGHTMAP == 1
+	#if APPLY_HEIGHTMAP_TYPE == 1
+	float HeightMap = tex2Dlod(HeightMap_Sampler, float4(IN.UV, 0,0)* HeightMap_Scale).x;
+	IN.Pos.xyz += IN.Normal * (HeightMap * Height_Intensity);
+	Out.Pos = mul(IN.Pos, WorldViewProjMatrix);
+	#endif
+	#endif
+	
+	#if APPLY_HEIGHTMAP == 1
+	#if APPLY_HEIGHTMAP_TYPE == 0
+	Out.PosWorld = mul( IN.Pos, WorldMatrix );
+	#endif
+	#endif
+	
+	// HgShadow
+	Out.PPos = Out.Pos;
+	
+	return Out;
+}
+
+//////////////////////////////////////////////////
+float3x3 Set_Rotation(float3 in_axis, float s, float c)
+{
+    float c_1 = 1.0f - c;
+	float3x3 in_m1 = 1;
+    float3 axis = normalize(in_axis);
+    float3 axis_s = axis * s;
+
+    float3 temp;
+    temp = axis * axis.x * c_1;
+    in_m1[0].x = temp.x + c;
+    in_m1[1].x = temp.y - axis_s.z;
+    in_m1[2].x = temp.z + axis_s.y;
+    temp = axis * axis.y * c_1;
+    in_m1[0].y = temp.x + axis_s.z;
+    in_m1[1].y = temp.y + c;
+    in_m1[2].y = temp.z - axis_s.x;
+    temp = axis * axis.z * c_1;
+    in_m1[0].z = temp.x - axis_s.y;
+    in_m1[1].z = temp.y + axis_s.x;
+    in_m1[2].z = temp.z + c;
+	return in_m1;
+}
+//////////////////////////////////////////////////
+
+	#if APPLY_TONE_MAP == 1
+	
+//////////////////////////////////////////////////
+//ToneMap Controller 
+#define CONTROLLER_NAME	"ToneMapPD Controller.pmx"
+
+//Alpha
+float Transparency : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Transparency"; >;
+
+float Exp_Morph_Plus : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Exposure +"; >;
+float Exp_Morph_Less : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Exposure -"; >;
+
+float Saturation_Plus : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Saturation +"; >;
+float Saturation_Less : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Saturation -"; >;
+
+float Gama_Plus : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Gama +"; >;
+float Gama_Less : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Gama -"; >;
+
+float Brightness_Plus : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Brightness +"; >;
+float Brightness_Less : CONTROLOBJECT < string name = "ToneMapPD Controller.pmx"; string item = "Brightness -"; >;
+
+/////////////////////////////////////////////////////////////////////////////////
+	
+float2 yccLookup(float x)
+{
+    float v9 = 1.0;
+    v9 *= 1 * Gama;
+	v9 += 1;
+	
+    v9 *= 1.0 + Gama_Plus * float(2.20);
+    v9 *= 1.0 - Gama_Less * float(0.8);
+	
+    float samples = 32;
+    float scale = 1.0 / samples;
+    float i = x * 16 * samples;
+    float v11 = exp( -i * scale );
+    float v10 = pow( 1.0 - v11, v9 );
+    v11 = v10 * 2.0 - 1.0;
+    v11 *= v11;
+    v11 *= v11;
+    v11 *= v11;
+    v11 *= v11;
+	samples *= Saturation;
+	
+	float SaturationP = Saturation_Plus;
+	float SaturationL = Saturation_Less;
+	samples *= 1 + SaturationP;
+	samples *= 1 + -SaturationL;
+	
+	
+	
+    return float2( v10, v10 * ( samples / i ) * ( 1.0 - v11 ) );
+}
+
+float3 ColorToneMapping( float3 c)
+{
+    float exposure = 1.0;
+	
+	Exposure *= 1.0 + Exp_Morph_Plus * 4.0;
+	Exposure *= 1.0 + -Exp_Morph_Less;
+	
+    exposure = 	lerp(exposure, Exposure, exposure);
+	
+    float4 color;
+    color.rgb = c;
+
+    color.y = dot( color.rgb, float3( 0.30, 0.59, 0.11 ) );
+    color.rb -= color.y;
+    color.yw = yccLookup( color.y * exposure * 0.0625 );
+    color.rb *= exposure * color.w;
+    color.w = dot( color.rgb, float3( -0.508475, 1.0, -0.186441 ) );
+    color.rb += color.y;
+    color.g = color.w;    
+	return color.rgb;
+}
+#endif
+/////////////////////////////////////////////////////////////////////////////////
+#if APPLY_HEIGHTMAP == 1
+#if APPLY_HEIGHTMAP_TYPE == 0
+float3 ParallaxOcclusionDirection(float3 normal, float3 worldPos, float2 coord)
+{
+	float3 viewNormal = mul(normal, (float3x3)WorldViewMatrix);
+	float3 viewPosition = mul(float4(worldPos, 1), WorldViewMatrix).xyz;
+	float3 viewdir = normalize(-viewPosition);
+
+	float3 dp1 = ddx(viewPosition);
+	float3 dp2 = ddy(viewPosition);
+
+	float2 duv1 = ddx(coord);
+	float2 duv2 = ddy(coord);
+
+	float3x3 M = float3x3(dp1, dp2, viewNormal);
+	float2x3 I = float2x3(cross(M[1], M[2]), cross(M[2], M[0]));
+	   
+	float2 proj = mul(I, viewdir) / dot(dp1, I[0]);
+
+	float3 direction;
+	direction.xy = duv1 * proj.x + duv2 * proj.y;
+	direction.z = dot(viewNormal, viewdir);
+
+	return direction;
+}
+
+float2 ParallaxOcclusionMap(sampler2D heightMap, float2 coord, float3 V, int numSteps, float parallaxScale)
+{
+	float step = 1.0 / numSteps;
+	float2 delta = parallaxScale * V.xy / (-V.z * numSteps);
+
+	float curLayerHeight = 0;
+	float curHeight = tex2D(heightMap, coord).r;
+	float2 curTexcoord = coord;
+
+	[unroll]
+	for (int i = 0; i < numSteps; i++)
+	{
+		if (curHeight <= curLayerHeight)
+			break;
+
+		curLayerHeight += step; 
+		curTexcoord -= delta;
+		curHeight = tex2D(heightMap, curTexcoord).r;
+	}
+
+	float2 deltaTexcoord = delta * 0.5;
+	float deltaHeight = step * 0.5;
+
+	curTexcoord += deltaTexcoord;
+	curLayerHeight -= deltaHeight;
+
+	[unroll]
+	for (int j = 0; j < 5; j++)
+	{
+		deltaTexcoord *= 0.5;
+		deltaHeight *= 0.5;
+
+		curHeight = tex2D(heightMap, curTexcoord).r;
+
+		if (curHeight > curLayerHeight)
+		{
+			curTexcoord -= deltaTexcoord;
+			curLayerHeight += deltaHeight;
+		}
+		else
+		{
+			curTexcoord += deltaTexcoord;
+			curLayerHeight -= deltaHeight;
+		}
+	}
+
+	return curTexcoord;
+}
+#endif
+#endif
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Pixel Shader
+float4 BufferShadow_PS(BufferShadow_OUTPUT IN, uniform bool useTexture, uniform bool useSphereMap, uniform bool useToon) : COLOR
+{
+//////////////////////////////////////////////////
+// Inputs
+	float2 UV			= IN.UV;
+	float2 UV1			= IN.UV1;
+//////////////////////////////////////////////////
+// Parallax
+	#if APPLY_HEIGHTMAP == 1
+	#if APPLY_HEIGHTMAP_TYPE == 0
+	float3 ParallaxViewDirection = ParallaxOcclusionDirection(IN.Normal, IN.PosWorld.xyz, UV);
+	UV = ParallaxOcclusionMap(HeightMap_Sampler, UV, ParallaxViewDirection, 15, Height_Intensity);
+	#endif
+	#endif
+//////////////////////////////////////////////////
+	float3 Normal		= normalize(IN.Normal);
+    float3 HalfVector	= normalize( normalize(IN.Eye) + -LightDirection );
+	float3 Eye			= normalize(IN.Eye);
+//////////////////////////////////////////////////
+	
+	float3x3 RotationTransform;
+
+	float length1 = length(LightDirection.xyz * float3(-1, 1, -1));
+    if (length1 >= 0.000001f) {
+        float3 cube_direction = (LightDirection.xyz * float3(-1, 1, -1)) * (1.0f / length1);
+
+		float3 Posi = float3(0, 1, 0);
+        length1 = length(Posi.xyz);
+        if (length1 >= 0.000001f) {
+            float3 position = Posi * (1.0f / length1);
+		
+			float3 axis = cross(cube_direction, position);
+            length1 = length(axis.xyz);
+
+            float v52 = dot(cube_direction, position);
+            float angle = abs(atan2(length1, v52));
+			
+			if (angle >= 0.01f && angle <= 3.131592653589793f) {
+                if (length1 != 0.0f)
+                    axis *= 1.0f / length1;
+				
+			RotationTransform =  Set_Rotation(axis, sin(-angle), cos(-angle));
+			}
+		}
+	}
+	
+	float Eyerot_x = radians(45);
+    float Eyerot_y = radians(-45);
+    float Eyerot_z = radians(0);
+	float3x3 EyeRotationX = {
+	    {1,	0,	0},
+	    {0, cos(Eyerot_x), sin(Eyerot_x)},
+	    {0, -sin(Eyerot_x), cos(Eyerot_x)},
+	};
+	float3x3 EyeRotationY = {
+	    {cos(Eyerot_y), 0, -sin(Eyerot_y)},
+	    {0, 1, 0},
+		{sin(Eyerot_y), 0,cos(Eyerot_y)},
+	    };
+	float3x3 EyeRotationZ = {
+	    {cos(Eyerot_z), sin(Eyerot_z), 0},
+	    {-sin(Eyerot_z), cos(Eyerot_z), 0},
+	    {0, 0, 1},
+	};
+	float3x3 EyeRot = RotationTransform;
+    EyeRot = mul( EyeRot, EyeRotationX );
+    EyeRot = mul( EyeRot, EyeRotationY );
+    EyeRot = mul( EyeRot, EyeRotationZ );
+	float3 EyeL = mul(Eye, (float3x3)EyeRot);
+
+//////////////////////////////////////////////////
+    float4 Color		= IN.Color;
+	float4 TexColor		= tex2D( ObjTexSampler, UV );
+	
+//////////////////////////////////////////////////
+    float4 ShadowColor	= 1;
+	
+	#if APPLY_SHADER_SHADOW_COLOR == 0
+	
+	if(SSS_Valid){
+	ShadowColor.rgb = lerp(ShadowColor.rgb, Shadow_Color * MaterialToon,Shadow_Color.a);
+	}else{
+    ShadowColor	= MaterialToon;
+	}
+	
+	#endif
+	
+	#if APPLY_SHADER_SHADOW_COLOR == 1
+
+	if(SSS_Valid){
+	ShadowColor.rgb = lerp(ShadowColor.rgb, Shadow_Color * MaterialToon,Shadow_Color.a);
+	}else{
+	ShadowColor.rgb = lerp(ShadowColor.rgb, Shadow_Color * MaterialToon,Shadow_Color.a);
+	}
+	
+	#endif
+//////////////////////////////////////////////////
+
+	#if APPLY_NORMALMAP == 1
+	float3 NormalMap		= tex2D( NormalMapSampler, UV).xyz * 2;		
+	NormalMap				= NormalMap.xyz;
+	float3x3 tangentFrame	= compute_tangent_frame(Normal, Eye, IN.UV);
+	NormalMap.z				-= NormalMap_Intensity;
+	Normal					= normalize(mul(NormalMap.xyz - 1.0f, tangentFrame));
+	#endif
+	
+//////////////////////////////////////////////////
+//Specular Map
+
+	#if APPLY_SPECULARMAP == 1
+	float4 SpecularMap = tex2D(SpecularMapSampler, UV);
+	#endif
+
+//////////////////////////////////////////////////
+	#if APPLY_ANISO == 0
+	#if APPLY_SPECULAR == 1
+	
+	#if APPLY_SHADER_SPECULAR == 0
+    float3 Specular		= pow( max(0,dot( HalfVector, Normal)), SpecularPower ) * SpecularColor;
+	#endif
+
+	#if APPLY_SHADER_SPECULAR == 1
+	float3 Specular		= pow( max(0,dot( HalfVector, Normal )), Specular_Shininess );
+	#endif
+	
+	Specular = step( 0.5 , Specular) ? 1 : 0;
+	
+	#if APPLY_SPECULARMAP == 1
+	Specular.rgb		*= SpecularMap.rgb + SpecularMap.rgb;
+	#endif
+	
+	#if APPLY_SHADER_SPECULAR == 1
+	Specular.rgb *= Specular_Color.rgb;
+	#endif
+	
+	Specular *= 1.5 * LightAmbient;
+	
+	#endif
+	#endif
+
+//////////////////////////////////////////////////
+//Specular 1
+	#if APPLY_ANISO == 0
+	float3 SpecularPos = 1;
+
+	float3 SpecularR = SpecularPos;
+	
+	SpecularPos.x -= Specular_Pos_X;
+	SpecularPos.y -= Specular_Pos_Y;
+	SpecularPos.x -= 1;
+	SpecularPos.y -= 1;
+	
+	float3 SpecularPose = mul(SpecularPos.xy, ViewMatrix);
+	
+	SpecularPose.x += LightDirection.x;
+	SpecularPose.y += LightDirection.y;
+	
+	float3 h = normalize(Eye + SpecularPose);
+	
+	h.x = -h.x;
+	h.y = -h.y;
+
+	#if APPLY_SHADER_SPECULAR == 0
+	float3 Specular1		= pow( max(0,dot(Normal,h)), SpecularPower * float(0.5) ) * SpecularColor;
+	Specular1 = step( 0.5 , Specular1) ? 1 : 0;
+	#endif
+	
+	#if APPLY_SHADER_SPECULAR == 1
+	float3 Specular1		= pow( max(0,dot(Normal,h)), Specular_Shininess * float(0.5));
+	Specular1 = step( 0.5 , Specular1) ? 1 : 0;
+	#endif
+	
+	#if APPLY_SPECULARMAP == 1
+	Specular1.rgb		*= SpecularMap.rgb + SpecularMap.rgb;
+	#endif
+	
+	#if APPLY_SHADER_SPECULAR == 1
+	Specular1.rgb *= Specular_Color.rgb;
+	#endif
+	
+	Specular1 *= 1.5 * LightAmbient;
+	
+	#endif
+	
+//////////////////////////////////////////////////
+//RimLight
+	
+	#if APPLY_RIMLIGHT_TYPE == 1
+	
+	#if APPLY_RIMLIGHT_LIGHT_DIRECTION == 0
+	float3 RimEye = Eye;
+	#endif
+	
+	#if APPLY_RIMLIGHT_LIGHT_DIRECTION == 1
+	float3 RIMDIR = Eye;
+	
+	RIMDIR.x += LightDirection.x;
+	RIMDIR.y += LightDirection.y;
+	
+	float3 RimEye = normalize(Eye + RIMDIR);
+	#endif
+	
+	#if APPLY_RIMLIGHT_TYPE == 1
+	#if APPLY_SHADER_SPECULAR == 0
+	float4 RimLight		= saturate(pow( 1 - dot(Normal, RimEye), 1 * SpecularPower * float(0.5) ) * float4(SpecularColor.rgb,0));
+	#endif
+	#endif
+	
+	#if APPLY_RIMLIGHT_TYPE == 1
+	#if APPLY_SHADER_SPECULAR == 1
+	float4 RimLight		= saturate(pow( 1 - dot(Normal, RimEye), 1 * Specular_Shininess * float(0.5) ) * float4(Specular_Color.rgb,0));
+	#endif
+	#endif
+	
+	RimLight = step( 0.5 , RimLight) ? 1 : 0;
+	
+	#if APPLY_SPECULARMAP == 1
+	RimLight.rgb *= SpecularMap.rgb + SpecularMap.rgb;
+	#endif
+	
+	RimLight.rgb *= 1.5 * LightAmbient;
+	
+	#endif
+	
+//////////////////////////////////////////////////
+//Custom RimLight
+	
+	#if APPLY_RIMLIGHT_TYPE == 3
+	
+	#if APPLY_RIMLIGHT_LIGHT_DIRECTION == 0
+	float3 RimCEye = Eye;
+	#endif
+	
+	#if APPLY_RIMLIGHT_LIGHT_DIRECTION == 1
+	float3 RIMCDIR = Eye;
+	
+	RIMCDIR.x += LightDirection.x;
+	RIMCDIR.y += LightDirection.y;
+	
+	float3 RimCEye = normalize(Eye + RIMCDIR);
+	#endif
+	
+	float4 RimLightC		= saturate(pow( 1 - dot(Normal, RimCEye), Custom_RimLight_Size / 10 ) * float4(Custom_RimLight_Color.rgb,0));
+	
+	RimLightC = step( 0.5 , RimLightC) ? 1 : 0;
+	
+	RimLightC.rgb *= 1.5 * LightAmbient;
+	
+	#endif
+	
+//////////////////////////////////////////////////
+//SPA
+	
+	#if APPLY_SPA == 1
+	float2 sphTex = mul( Normal, (float3x3)ViewMatrix ).xyz;
+	sphTex.x = sphTex.x * 0.5f + 0.5f;
+	sphTex.y = sphTex.y * -0.5f + 0.5f;
+	float4 SPAMap = tex2D(ObjSphareSampler,sphTex) * 1;
+	
+	#if APPLY_SPECULARMAP == 1
+	SPAMap.rgb *= SpecularMap.a;
+	#endif
+
+	SPAMap.rgb *= Specular_Color.a;
+
+	#endif
+	
+//////////////////////////////////////////////////
+//Cubemap
+	#if APPLY_CUBEMAP == 1
+	
+	#if APPLY_CUBEMAP == 1
+	#if APPLY_CUBEMAP_LIGHT_DIRECTION == 0
+	float3 CubeMapReflection = reflect(Normal, Eye);
+	#endif
+	#endif
+	
+	#if APPLY_CUBEMAP == 1
+	#if APPLY_CUBEMAP_LIGHT_DIRECTION == 1
+	float3 CubeMapReflection = reflect(Normal, EyeL);
+	#endif
+	#endif
+	
+	float4 CubeMap = texCUBE(CubeMapSampler, CubeMapReflection);
+	
+	#if APPLY_SPECULARMAP == 1
+	CubeMap.rgb *= SpecularMap.a;
+	#endif
+
+	CubeMap.rgb *= Specular_Color.a;
+
+	#endif
+//////////////////////////////////////////////////
+//REFRACTION
+
+	#if APPLY_REFRACTION == 1
+	
+	#if APPLY_REFRACTION == 1
+	#if APPLY_REFRACTION_LIGHT_DIRECTION == 0
+	float3 Refract = refract(Eye, -Normal, 1.0/Refraction_Index).xyz;
+	#endif
+	#endif
+	
+	#if APPLY_REFRACTION == 1
+	#if APPLY_REFRACTION_LIGHT_DIRECTION == 1
+	float3 Refract = refract(EyeL, -Normal, 1.0/Refraction_Index).xyz;
+	#endif
+	#endif
+	
+	#if APPLY_REFRACTION == 1
+	#if APPLY_REFRACTION_REFLECTION == 0
+	Refract = -Refract.xzy;
+	Refract.z = -Refract.z;
+	#endif
+	#endif
+	
+	#if APPLY_REFRACTION == 1
+	#if APPLY_REFRACTION_REFLECTION == 1
+	Refract.y = -Refract.y;
+	#endif
+	#endif
+	
+	#if APPLY_REFRACTION == 1
+	#if APPLY_REFRACTION_REFLECTION == 0
+	float4 RefractedColor = texCUBE(Refraction_Sampler, Refract) * Refraction_Intensity;
+	#endif
+	#endif
+
+	#if APPLY_REFRACTION == 1
+	#if APPLY_REFRACTION_REFLECTION == 1
+	float4 RefractedColor = texDP(sampEnvMapF, sampEnvMapB, Refract) * Refraction_Intensity;
+	#endif
+	#endif
+	
+		#if APPLY_REFRACTION == 1
+		#if APPLY_REFRACTION_SPECULARMAP == 1
+		#if APPLY_SPECULARMAP == 1
+		RefractedColor.rgb *= SpecularMap.a;
+		#endif
+		#endif
+		#endif
+		
+	#endif
+	
+//////////////////////////////////////////////////
+//Fresnel
+
+	#if APPLY_RIMLIGHT_TYPE == 2
+	
+	#if APPLY_RIMLIGHT_LIGHT_DIRECTION == 0
+	float3 FresnelEye = Eye;
+	#endif
+	
+	#if APPLY_RIMLIGHT_LIGHT_DIRECTION == 1
+	float3 FRESNELDIR = Eye;
+	
+	FRESNELDIR.x += LightDirection.x;
+	FRESNELDIR.y += LightDirection.y;
+	
+	float3 FresnelEye = normalize(Eye + FRESNELDIR);
+	#endif
+	
+	#if APPLY_SHADER_SPECULAR == 0
+	float3 Fresnel = saturate(pow( 1 - dot(Normal, FresnelEye), 1 * SpecularPower * float(0.5) )  * Specular_Color.a);
+	#endif
+	#if APPLY_SHADER_SPECULAR == 1
+	float3 Fresnel = saturate(pow( 1 - dot(Normal, FresnelEye), 1 * Specular_Shininess * float(0.5) ) * Specular_Color.a);
+	#endif
+	
+	Fresnel = step( 0.5 , Fresnel) ? 1 : 0;
+	
+	#if APPLY_CUBEMAP == 1
+	float4 CubeMapF = texCUBE(CubeMapSampler, CubeMapReflection);
+	
+	CubeMapF.rgb *= Specular_Color.a;
+	
+	Fresnel *= CubeMapF;
+	#endif
+	
+	#if APPLY_SPA == 1
+	float4 SPAMapF = tex2D(ObjSphareSampler,sphTex) * 1;
+	
+	Fresnel.rgb *= SPAMapF.a;
+	#endif
+	
+	#if APPLY_REFRACTION == 1
+	
+	#if APPLY_REFRACTION == 1
+	#if APPLY_REFRACTION_REFLECTION == 0
+	float4 RefractedColorF = texCUBE(Refraction_Sampler, Refract) * Refraction_Intensity;
+	#endif
+	#endif
+	
+	#if APPLY_REFRACTION == 1
+	#if APPLY_REFRACTION_REFLECTION == 1
+	float4 RefractedColorF = texDP(sampEnvMapF, sampEnvMapB, Refract) * Refraction_Intensity;
+	#endif
+	#endif
+	
+	Fresnel.rgb *= RefractedColorF.a;
+	
+	#endif
+	
+	#if APPLY_SPECULARMAP == 1
+	Fresnel.rgb *= lerp(Fresnel , Fresnel, SpecularMap.a);
+	#endif
+	
+	Fresnel.rgb *= 1.5 * LightAmbient;
+	
+	#endif
+
+//////////////////////////////////////////////////
+//Aniso
+
+	#if APPLY_ANISO == 1
+	float3 Aniso;
+
+	if(Aniso_Valid){
+	float2 AnisoCoord = float2( ( IN.PPos.x/IN.PPos.w + 1.0f ) * 0.5f, 1.0f - ( IN.PPos.y/IN.PPos.w + 1.0f ) * 0.5f ) + 2;
+	float4 ANISO_X = tex2D(Aniso_Samp, AnisoCoord);
+	
+	ANISO_X.yz = pow(ANISO_X.yz, Aniso_Size * 5);
+	
+	float3 ANISO_X_T = lerp(step( 1.0 , ANISO_X) ? 1 : 0, ANISO_X, step( 2.0 , ANISO_X) ? 1 : 0);
+	ANISO_X.rgb = lerp(ANISO_X,1,1 + -ANISO_X_T * 0.5);
+	
+    float2 aniso_coef;
+    aniso_coef = float2(dot(Normal, -LightDirection.xyz).xx) * float2(0.7, -0.7) + float2(0.3, 0.3);
+    aniso_coef = ANISO_X.yz * clamp(aniso_coef, (0.0), (1.0)) * float2(0.18, 0.05);
+
+    Aniso = aniso_coef.x * 3.1 + (Aniso_Back.rgb + 2 * aniso_coef.y);
+
+	Aniso.rgb *= Specular_Color;
+	} else {
+	float3 AnisoPos = 1;
+
+	float3 AnisoR = AnisoPos;
+	
+	AnisoPos.x -= Aniso_Pos_X;
+	AnisoPos.y -= Aniso_Pos_Y;
+	AnisoPos.x -= 1;
+	AnisoPos.y -= 1;
+	
+	float3 AnisoPose = mul(AnisoPos.xy, ViewMatrix);
+	
+	AnisoPose.x += LightDirection.x;
+	AnisoPose.y += LightDirection.y;
+	
+	float3 h = normalize(Eye + AnisoPose);
+	
+	h.x = -h.x;
+	h.y = -h.y;
+	
+	float HdotA = dot(normalize(normalize (Normal)), h);
+	
+	#if APPLY_SHADER_SPECULAR == 0
+	Aniso = max(Aniso_Back, sin(radians((HdotA + 0) * 180)* Aniso_Size));
+	Aniso = lerp(Aniso,1,step( 0.5 , Aniso) ? 1 : 0);
+	Aniso.rgb *= SpecularColor;
+	#endif
+
+	#if APPLY_SHADER_SPECULAR == 1
+	Aniso = max(Aniso_Back, sin(radians((HdotA + 0) * 180)* Aniso_Size));
+	Aniso = lerp(Aniso,1,step( 0.5 , Aniso) ? 1 : 0);
+	Aniso.rgb *= Specular_Color;
+	#endif
+	
+	float AnisoIntensitySmooth = smoothstep(0.0, Aniso_Softness, 1);
+	
+	Aniso = AnisoIntensitySmooth * Aniso;
+	}
+	
+		#if APPLY_SPECULARMAP == 1
+		float3 SpecularMapA = SpecularMap.rgb + SpecularMap.rgb;
+		SpecularMapA += Aniso * SpecularMapA;
+		Aniso *= SpecularMapA.rgb;
+		#endif
+		
+		Aniso *= 1.5  * LightAmbient;
+	
+	#endif
+
+//////////////////////////////////////////////////
+//Toon Reflection Mask
+
+	#if APPLY_TOON_REFLECTION_MASK == 1
+	float2 ToonRUV = mul( Eye, (float3x3)ViewMatrix );
+	ToonRUV.x = ToonRUV.x * 0.5f + 0.5f;
+	ToonRUV.y = ToonRUV.y * -0.5f + 0.5f;
+	float4 ToonRefMask = tex2D(ToonMaskReflection_Sampler, ToonRUV * ToonMaskReflection_Scale).a;
+	
+		#if APPLY_ANISO == 0
+		#if APPLY_SPECULAR == 1
+		#if APPLY_TOON_REFLECTION_MASK_SPECULAR == 1
+		Specular		= lerp(Specular, Specular * ToonRefMask, ToonMaskReflection_Intensity);
+		#endif
+		#endif
+		#endif
+
+		#if APPLY_ANISO == 1
+		#if APPLY_TOON_REFLECTION_MASK_SPECULAR == 1
+		Aniso			= lerp(Aniso, Aniso * ToonRefMask, ToonMaskReflection_Intensity);
+		#endif
+		#endif
+
+		#if APPLY_RIMLIGHT_TYPE == 1
+		#if APPLY_TOON_REFLECTION_MASK_RIMLIGHT == 1
+		RimLight		= lerp(RimLight, RimLight * ToonRefMask, ToonMaskReflection_Intensity);
+		#endif
+		#endif
+
+		#if APPLY_RIMLIGHT_TYPE == 3
+		#if APPLY_TOON_REFLECTION_MASK_RIMLIGHT == 1
+		RimLightC		= lerp(RimLightC, RimLightC * ToonRefMask, ToonMaskReflection_Intensity);
+		#endif
+		#endif
+	
+	#endif
+//////////////////////////////////////////////////
+//Texture
+
+    if ( useTexture ) {
+		Color.rgb *= TexColor.rgb * Texture_Brightness;
+    }
+
+//////////////////////////////////////////////////
+// IBL
+	if(SSS_Valid)
+	{
+	#if APPLY_IBL_SPECULAR == 1
+	float2 texCoord2 = float2( ( IN.PPos.x/IN.PPos.w + 1.0f ) * 0.5f, 1.0f - ( IN.PPos.y/IN.PPos.w + 1.0f ) * 0.5f ) + 2;
+    float4 IBL2 = tex2Dlod(SSS_Samp, float4(texCoord2, 0, 1));
+	
+	float IBL2TC = (IBL2.r+IBL2.g+IBL2.b)/3;
+	float4 IBL2C = float4(IBL2TC,IBL2TC,IBL2TC,IBL2.a);
+		
+	IBL2 = lerp(IBL2C, IBL2, IBL2.a * 0.0);
+	
+	float4 IBL3 = texCUBElod(IBLSampler2, float4(1 + EyeL, 0));
+    IBL2.rgb = texCUBElod(IBLSampler3, float4(1 + EyeL, 0));
+    IBL2.rgb = IBL2.rgb + -IBL3.rgb;
+    float4 IBL4 = lerp((IBL2 + IBL3) , 0, IBL_Brightness / 100);
+	
+	#if APPLY_IBL_LIGHT_AMBIENT == 1
+	IBL4.rgb *= LightAmbient.rgb * AmbientColor + 0.5;
+	#endif
+	
+	#if APPLY_IBL_SPECULAR == 1
+	#if APPLY_ANISO == 0
+	#if APPLY_SPECULAR == 1
+	Specular.rgb = lerp(Specular.rgb, Specular.rgb * IBL4.rgb,IBL_Intensity);
+	#endif
+	#endif
+	#endif
+	
+	#if APPLY_IBL_SPECULAR == 1
+	#if APPLY_ANISO == 1
+	Aniso.rgb = lerp(Aniso.rgb, Aniso.rgb * IBL4.rgb,IBL_Intensity);
+	#endif
+	#endif
+	
+	#endif
+	} else {
+	#if APPLY_IBL == 1
+	
+	#if APPLY_IBL_LIGHT_DIRECTION == 0
+	float3 IBLPos = Normal;
+	#endif
+	
+	#if APPLY_IBL_LIGHT_DIRECTION == 1
+    float IBLrot_x = radians(45);
+    float IBLrot_y = radians(-45);
+    float IBLrot_z = radians(0);
+	float3x3 IBLRotationX = {
+	    {1,	0,	0},
+	    {0, cos(IBLrot_x), sin(IBLrot_x)},
+	    {0, -sin(IBLrot_x), cos(IBLrot_x)},
+	};
+	float3x3 IBLRotationY = {
+	    {cos(IBLrot_y), 0, -sin(IBLrot_y)},
+	    {0, 1, 0},
+		{sin(IBLrot_y), 0,cos(IBLrot_y)},
+	    };
+	float3x3 IBLRotationZ = {
+	    {cos(IBLrot_z), sin(IBLrot_z), 0},
+	    {-sin(IBLrot_z), cos(IBLrot_z), 0},
+	    {0, 0, 1},
+	};
+	float3x3 IBLRot = RotationTransform;
+    IBLRot = mul( IBLRot, IBLRotationX );
+    IBLRot = mul( IBLRot, IBLRotationY );
+    IBLRot = mul( IBLRot, IBLRotationZ );
+	float3 IBLPos = mul(Normal, (float3x3)IBLRot);
+	#endif
+	
+	float4 IBL = texCUBElod(IBLSampler, float4(1 + IBLPos, 0)) * IBL_Brightness;
+	
+	#if APPLY_IBL_SPECULAR == 1
+    float4 IBL2 = texCUBElod(IBLSampler, float4(Normal, 1));
+	
+	float4 IBL3 = texCUBElod(IBLSampler2, float4(1 + EyeL, 0));
+    IBL2.rgb = texCUBElod(IBLSampler3, float4(1 + EyeL, 0));
+    IBL2.rgb = IBL2.rgb + -IBL3.rgb;
+    float4 IBL4 = lerp((IBL2 + IBL3) , 0, IBL_Brightness / 100);
+	#endif
+	
+	#if APPLY_IBL_LIGHT_AMBIENT == 1
+	IBL.rgb *= LightAmbient.rgb * AmbientColor + 0.5;
+	
+	#if APPLY_IBL_SPECULAR == 1
+	IBL4.rgb *= LightAmbient.rgb * AmbientColor + 0.5;
+	#endif
+	#endif
+	
+	Color.rgb = lerp(Color.rgb, Color.rgb * IBL.rgb,IBL_Intensity);
+	ShadowColor.rgb = lerp(ShadowColor.rgb, ShadowColor.rgb * IBL.rgb,IBL_Shadow_Intensity);
+	
+	#if APPLY_IBL_SPECULAR == 1
+	#if APPLY_ANISO == 0
+	#if APPLY_SPECULAR == 1
+	Specular.rgb = lerp(Specular.rgb, Specular.rgb * IBL4.rgb,IBL_Intensity);
+	#endif
+	#endif
+	#endif
+	
+	#if APPLY_IBL_SPECULAR == 1
+	#if APPLY_ANISO == 1
+	Aniso.rgb = lerp(Aniso.rgb, Aniso.rgb * IBL4.rgb,IBL_Intensity);
+	#endif
+	#endif
+	
+	#endif
+	}
+	
+//////////////////////////////////////////////////
+// Final Colors
+
+	#if APPLY_TINT == 0
+	
+	#if APPLY_ANISO == 0
+	Color.rgb = lerp(Color.rgb,1,Specular);
+	Color.rgb = lerp(Color.rgb,1,Specular1);
+	#endif
+	#if APPLY_SPA == 1
+	Color.rgb = lerp(Color.rgb,1,SPAMap);
+	#endif
+	#if APPLY_RIMLIGHT_TYPE == 1
+	Color.rgb = lerp(Color.rgb,1,RimLight);
+	#endif
+	#if APPLY_CUBEMAP == 1
+	Color.rgb = lerp(Color.rgb,1,CubeMap);
+	#endif
+	#if APPLY_REFRACTION == 1
+	Color.rgb = lerp(Color.rgb,1,RefractedColor);
+	#endif
+	#if APPLY_RIMLIGHT_TYPE == 2
+	Color.rgb = lerp(Color.rgb,1,Fresnel);
+	#endif
+	#if APPLY_RIMLIGHT_TYPE == 3
+	Color.rgb = lerp(Color.rgb,1,RimLightC);
+	#endif
+	#if APPLY_ANISO == 1
+	Color.rgb = lerp(Color.rgb,1,Aniso);
+	#endif
+	#endif
+	
+	#if APPLY_TINT == 1
+	
+	#if APPLY_ANISO == 0
+	Color.rgb += Specular;
+	Color.rgb += Specular1;
+	#endif
+	#if APPLY_SPA == 1
+	Color.rgb += SPAMap;
+	#endif
+	#if APPLY_RIMLIGHT_TYPE == 1
+	Color.rgb += RimLight;
+	#endif
+	#if APPLY_CUBEMAP == 1
+	Color.rgb += CubeMap;
+	#endif
+	#if APPLY_REFRACTION == 1
+	Color.rgb += RefractedColor;
+	#endif
+	#if APPLY_RIMLIGHT_TYPE == 2
+	Color.rgb += Fresnel;
+	#endif
+	#if APPLY_RIMLIGHT_TYPE == 3
+	Color.rgb += RimLightC;
+	#endif
+	#if APPLY_ANISO == 1
+	Color.rgb += Aniso;
+	#endif
+	
+	#endif
+	
+//////////////////////////////////////////////////
+// Vertex Color
+
+	#if APPLY_VERTEXCOLOR == 1
+	float4 UV2			= IN.UV2;
+	float4 VertexColor = IN.UV2 * VertexColor_Intensity;
+	Color.rgb *= VertexColor.rgb;
+	#endif
+	
+//////////////////////////////////////////////////
+// Ambient Occlussion
+
+	#if APPLY_AMBIENTOCCLUSSION == 1
+	
+	#if APPLY_AMBIENTOCCLUSSION_UV == 1
+	float2 UVAO = UV;
+	#endif
+	#if APPLY_AMBIENTOCCLUSSION_UV == 0
+	float2 UVAO = UV1;
+	#endif
+	float4 AmbientOcclussion = tex2D(AO_Sampler, UVAO);
+	
+	#if AMBIENTOCCLUSSION_TYPE == 1
+	
+	#if APPLY_AMBIENTOCCLUSSION_RGB_CHANNELS == 0
+	Color.rgb = lerp(Color.rgb, Color.rgb * AmbientOcclussion.rgb,Ambient_Occlussion_Intensity);
+	#endif
+	
+	#if APPLY_AMBIENTOCCLUSSION_RGB_CHANNELS == 1
+	#if R_CHANNEL_AMBIENTOCCLUSSION == 1
+	Color.rgb = lerp(Color.rgb, Color.rgb * AmbientOcclussion.r,Ambient_Occlussion_Intensity);
+	#endif
+	#endif
+	
+	#if APPLY_AMBIENTOCCLUSSION_RGB_CHANNELS == 1
+	#if G_CHANNEL_AMBIENTOCCLUSSION == 1
+	Color.rgb = lerp(Color.rgb, Color.rgb * AmbientOcclussion.g,Ambient_Occlussion_Intensity);
+	#endif
+	#endif
+	
+	#if APPLY_AMBIENTOCCLUSSION_RGB_CHANNELS == 1
+	#if B_CHANNEL_AMBIENTOCCLUSSION == 1
+	Color.rgb = lerp(Color.rgb, Color.rgb * AmbientOcclussion.b,Ambient_Occlussion_Intensity);
+	#endif
+	#endif
+	
+	#endif
+	
+	#if AMBIENTOCCLUSSION_TYPE == 2
+	
+	#if APPLY_AMBIENTOCCLUSSION_RGB_CHANNELS == 0
+	Color += AmbientOcclussion;
+	Color.rgb = lerp(Color.rgb, Color.rgb + AmbientOcclussion.rgb,Ambient_Occlussion_Intensity);
+	#endif
+	
+	#if APPLY_AMBIENTOCCLUSSION_RGB_CHANNELS == 1
+	#if R_CHANNEL_AMBIENTOCCLUSSION == 1
+	Color.rgb = lerp(Color.rgb, Color.rgb + AmbientOcclussion.r,Ambient_Occlussion_Intensity);
+	#endif
+	#endif
+	
+	#if APPLY_AMBIENTOCCLUSSION_RGB_CHANNELS == 1
+	#if G_CHANNEL_AMBIENTOCCLUSSION == 1
+	Color.rgb = lerp(Color.rgb, Color.rgb + AmbientOcclussion.g,Ambient_Occlussion_Intensity);
+	#endif
+	#endif
+	
+	#if APPLY_AMBIENTOCCLUSSION_RGB_CHANNELS == 1
+	#if B_CHANNEL_AMBIENTOCCLUSSION == 1
+	Color.rgb = lerp(Color.rgb, Color.rgb + AmbientOcclussion.g,Ambient_Occlussion_Intensity);
+	#endif
+	#endif
+	
+	#endif
+	#endif
+	
+//////////////////////////////////////////////////
+		//ALPHA
+		#if APPLY_ALPHA == 1
+		Color.a = TexColor.a;
+		#endif
+
+//////////////////////////////////////////////////
+//Transparency
+
+	#if APPLY_TRANSPARENCY == 1
+	float4 TransparencyMap = tex2D(Transparency_Sampler, UV);
+	#endif
+
+//////////////////////////////////////////////////
+//Alpha Mask
+
+	#if APPLY_ALPHA_MASK == 1
+	
+	#if APPLY_ALPHA_MASK_UV == 0
+	float2 UVA = UV;
+	#endif
+	#if APPLY_ALPHA_MASK_UV == 1
+	float2 UVA = UV1;
+	#endif
+	
+	float AlphaMask = tex2D(Alpha_Mask_Sampler, UVA);
+	#endif
+
+//////////////////////////////////////////////////
+
+		#if APPLY_TRANSPARENCY == 1
+		
+		float3 TRENDER = (pow( dot( Normal , Eye ), 1));
+		
+		float3 TEYEDIR = dot( Normal, -Eye.y);
+		float3 TEYEDIR1 = dot( Normal, Eye.y);
+		
+		#if TRANSPARENCY_COLOR_TYPE == 0
+		TransparencyMap.rgb	*= TransparencyMap + (0.9647058823529412, 0.8196078431372549, 0.7490196078431373);
+		#endif
+		
+		#if TRANSPARENCY_COLOR_TYPE == 1
+		TransparencyMap.rgb	*= TransparencyMap.rgb + Transparency_Color.rgb;
+		TransparencyMap.rgb	*= Transparency_Color.a;
+		#endif
+		
+		TRENDER = lerp( TRENDER.rgb, TRENDER.rgb, TRENDER.rgb + normalize(TEYEDIR * TEYEDIR1));
+		
+		TransparencyMap.rgb = lerp(TransparencyMap.rgb, TransparencyMap.rgb * TRENDER.rgb, Transparency_Intensity);
+		
+		Color.a   += TransparencyMap.a;
+		
+		Color.rgb = lerp(Color.rgb, Color.rgb * TransparencyMap.rgb, 1);
+		#endif
+
+//////////////////////////////////////////////////
+
+		#if APPLY_ALPHA_MASK == 1
+		
+		#if APPLY_ALPHA_MASK_RGB_CHANNELS == 0
+		Color.a   *= AlphaMask;
+		#endif
+	
+		#if APPLY_ALPHA_MASK_RGB_CHANNELS == 1
+		#if R_CHANNEL_ALPHA_MASK == 1
+		Color.a   *= AlphaMask.r;
+		#endif
+		#endif
+	
+		#if APPLY_ALPHA_MASK_RGB_CHANNELS == 1
+		#if G_CHANNEL_ALPHA_MASK == 1
+		Color.a   *= AlphaMask.g;
+		#endif
+		#endif
+	
+		#if APPLY_ALPHA_MASK_RGB_CHANNELS == 1
+		#if B_CHANNEL_ALPHA_MASK == 1
+		Color.a   *= AlphaMask.b;
+		#endif
+		#endif
+		
+		#endif
+	
+//////////////////////////////////////////////////
+	
+	#if APPLY_ALPHA == 1
+	Color.a *= DiffuseColor.a;
+	ShadowColor.a *= DiffuseColor.a;
+	
+	#if APPLY_VERTEXCOLOR == 1
+	Color.a *= VertexColor.a;
+	#endif
+	
+	#endif
+	
+//////////////////////////////////////////////////
+// Alpha Color
+	
+	#if APPLY_ALPHA == 1
+	#if APPLY_COLOR_ALPHA == 1
+	
+    if((Alpha_Color_Intensity) > 0.0f){
+	float len = length(Color.rgb - saturate(Alpha_Color));
+	if( len <= (Alpha_Color_Intensity) ) Color.a = 0;
+    }
+	
+	#endif
+	#endif
+
+//////////////////////////////////////////////////
+
+		#if APPLY_ALPHA_CLIP == 1
+		clip(Color.a < Alpha_Clip ? -1:1);
+		#endif
+
+//////////////////////////////////////////////////
+//Over Transparency
+		#if APPLY_OVER_TRANSPARENCY == 1
+		
+		#if APPLY_ANISO == 0
+		#if APPLY_SPECULAR == 1
+		Color.a    += Specular;
+		#endif
+		#endif
+		
+		#if APPLY_SPA == 1
+		#if APPLY_OVER_TRANSPARENCY == 1
+		Color.a    += SPAMap;
+		#endif
+		#endif
+
+		#if APPLY_CUBEMAP == 1
+		#if APPLY_OVER_TRANSPARENCY == 1
+		Color.a    += CubeMap;
+		#endif
+		#endif
+
+		#if APPLY_RIMLIGHT_TYPE == 1
+		#if APPLY_OVER_TRANSPARENCY == 1
+		Color.a    += RimLight;
+		#endif
+		#endif
+
+		#if APPLY_RIMLIGHT_TYPE == 2
+		#if APPLY_OVER_TRANSPARENCY == 1
+		Color.a    += Fresnel;
+		#endif
+		#endif
+
+		#if APPLY_RIMLIGHT_TYPE == 3
+		#if APPLY_OVER_TRANSPARENCY == 1
+		Color.a    += RimLightC;
+		#endif
+		#endif
+
+		#if APPLY_REFRACTION == 1
+		#if APPLY_OVER_TRANSPARENCY == 1
+		Color.a    += RefractedColor;
+		#endif
+		#endif
+
+		#if APPLY_ANISO == 1
+		Color.a    += Aniso;
+		#endif
+
+		#endif
+//////////////////////////////////////////////////
+
+		#if APPLY_ALPHA_MASK == 1
+		Color.a   *= AlphaMask;
+		#endif
+	
+//////////////////////////////////////////////////
+
+	#if APPLY_EYEMASK == 1
+	float4 EyeMask = tex2D(EyeMask_Sampler, IN.UV);
+	
+	#if EYEMASK_TYPE == 0
+	Color.rgb = lerp(Color.rgb,1,EyeMask.rgb * EyeMask.a * 2);
+	#endif
+	
+	#if EYEMASK_TYPE == 1
+	Color += EyeMask * EyeMask.a * 2;
+	#endif
+	
+	#endif
+	
+//////////////////////////////////////////////////
+	
+	#if APPLY_ALPHA == 1
+	Color.a *= DiffuseColor.a;
+	ShadowColor.a *= DiffuseColor.a;
+	
+	#if APPLY_VERTEXCOLOR == 1
+	Color.a *= VertexColor.a;
+	#endif
+	
+	#endif
+	
+//////////////////////////////////////////////////
+//Shadow
+//////////////////////////////////////////////////
+    // Convert to texture coordinates
+    IN.ZCalcTex /= IN.ZCalcTex.w;
+    float2 TransTexCoord;
+    TransTexCoord.x = (1.0f + IN.ZCalcTex.x)*0.5f;
+    TransTexCoord.y = (1.0f - IN.ZCalcTex.y)*0.5f;
+    
+		if( any( saturate(TransTexCoord) != TransTexCoord ) ) {
+        return Color;
+		} else {
+        float ShadowComp = 0;
+		float U = SoftShadowParam / SHADOWMAP_SIZE;
+		float V = SoftShadowParam / SHADOWMAP_SIZE;
+        if(parthf) {
+            // セルフシャドウ mode2
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,0)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,0)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,0)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,-V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,-V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,-V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+        } else {
+            // セルフシャドウ mode1
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,0)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,0)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,0)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,-V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,-V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,-V)).r , 0.0f)*SKII1-0.3f);
+        }
+        float LightNormal = dot(normalize(IN.Normal), -LightDirection);
+		
+        float SHADSmooth = smoothstep(0.0, Toon_Smooth, 1);
+        LightNormal = SHADSmooth * LightNormal;
+		
+        ShadowComp = 1-saturate(ShadowComp/9);
+		ShadowComp = min(saturate(LightNormal * Toon), ShadowComp);
+
+//////////////////////////////////////////////////
+	if(HgShadow_Valid)
+	{
+        float comp = HgShadow_GetSelfShadowRate(IN.PPos);
+        if ( useToon ) 
+		{
+		comp = min(saturate(LightNormal * Toon), comp);
+		ShadowComp = comp;
+		ShadowComp = step( 0.5 , ShadowComp) ? 1 : 0;
+		}
+	}
+
+//////////////////////////////////////////////////
+//SubSurfaceToon
+
+	if(SSS_Valid)
+	{ } else {
+ 	#if APPLY_SUBSURFACETOON == 1
+	
+	float3 SubSurfaceToon = min(pow(dot(Normal, -LightDirection), SubSurfaceToon_Size), ShadowComp) * SubSurfaceToon_Color.rgb * 1 * SubSurfaceToon_Bright;
+	
+    float3 SubSurfaceToon1 = pow( max(0,dot( EyeL, Normal)), 2) * SubSurfaceToon_Color * float(0.3) * SubSurfaceToon_Bright;
+	
+	float3 SubSurfaceToon2 = saturate(pow( 1 - dot(Normal, EyeL), 1 ) * SubSurfaceToon_Color) * SubSurfaceToon_Bright * float(0.3);
+
+	float3 SubSurfaceToonDisplay = saturate(pow(1.0 - dot( LightDirection, Eye ), 2));
+	float3 SubSurfaceToonDisplay1 = saturate(pow(1.0 - dot( -LightDirection, Eye ), 2));
+	
+	SubSurfaceToon *= SubSurfaceToonDisplay;
+	SubSurfaceToon1 *= SubSurfaceToonDisplay;
+	SubSurfaceToon2 *= SubSurfaceToonDisplay1;
+	
+	float3 SubSurfaceToonM = lerp(SubSurfaceToon1.rgb, SubSurfaceToon1.rgb + SubSurfaceToon2.rgb, 1);
+	
+	#if APPLY_SUBSURFACETOON_MAP == 1
+	float4 SubSurfaceToonMap = tex2D(SubSurfaceToon_Map_Sampler, UV);
+	SubSurfaceToonc.rgb *= SubSurfaceToonMap.rgb;
+	SubSurfaceToonM.rgb *= SubSurfaceToonMap.rgb;
+	
+	SubSurfaceToonc.rgb *= SubSurfaceToonMap.a;
+	SubSurfaceToonM.rgb *= SubSurfaceToonMap.a;
+	#endif
+	
+	SubSurfaceToon *= LightAmbient + 0.5;
+	
+	ShadowColor.rgb += SubSurfaceToon;
+	ShadowColor.rgb += SubSurfaceToonM;
+	#endif
+	}
+
+//////////////////////////////////////////////////
+
+	#if SHADER_TYPE == 1
+	float3 HalfLambert = min(pow(dot(Normal, -LightDirection) * 0.5 + 0.5, 2) * 0.5 + 0.5, (1,1,ShadowComp));
+	HalfLambert = pow(HalfLambert * 0.5 + 0.5, 1.0) * (HalfLambert.rgb = pow(HalfLambert, ShadowColor * HalfLambert * 0.5 + 0.5));
+	
+	ShadowComp = HalfLambert;
+	#endif
+
+//////////////////////////////////////////////////
+//Shadow Color
+
+	#if APPLY_TINT == 0
+	#if APPLY_BACK_LIGHT == 1
+	ShadowColor.rgb =  lerp(ShadowColor.rgb,1,Back_Light.rgb);
+	#endif
+	#if APPLY_FRONT_LIGHT == 1
+	ShadowColor.rgb = lerp(ShadowColor.rgb,1,Front_Light.rgb);
+	#endif
+	#endif
+	
+	#if APPLY_TINT == 1
+	#if APPLY_BACK_LIGHT == 1
+	ShadowColor.rgb += Back_Light;
+	#endif
+	#if APPLY_FRONT_LIGHT == 1
+	ShadowColor.rgb += Front_Light * ShadowComp;
+	#endif
+	#endif
+	
+	if(SSS_Valid)
+	{
+		float2 texCoord = float2( ( IN.PPos.x/IN.PPos.w + 1.0f ) * 0.5f, 1.0f - ( IN.PPos.y/IN.PPos.w + 1.0f ) * 0.5f ) + 2;
+		float4 SSSM = tex2Dlod(SSS_Samp, float4(texCoord.xy, 0, 1));
+		
+		#if APPLY_SUBSURFACETOON == 0
+		#if APPLY_SUBSURFACETOON_FILTER_SHADOW == 1
+		float SSSTC = (SSSM.r+SSSM.g+SSSM.b)/3;
+		float4 SSSC = float4(SSSTC,SSSTC,SSSTC,SSSM.a);
+		
+		SSSM = lerp(SSSC, SSSM, SSSM.a * 0.0);
+		
+		SSSM.rgb *= LightAmbient + 0.5;
+		Color.rgb = lerp(Color.rgb, Color.rgb * SSSM.rgb,SubSurfaceToon_Intensity);
+		ShadowColor.rgb = lerp(ShadowColor.rgb, ShadowColor.rgb * SSSM.rgb, 0.5 * SubSurfaceToon_Intensity);
+		#endif
+		#endif
+		
+		#if APPLY_SUBSURFACETOON == 1
+		float SSSTC = (SSSM.r+SSSM.g+SSSM.b)/3;
+		float4 SSSC = float4(SSSTC,SSSTC,SSSTC,SSSM.a);
+		
+		SSSM = lerp(SSSC, SSSM, SSSM.a * SubSurfaceToon_Saturation);
+		
+		SSSM.rgb *= LightAmbient + 0.5;
+		Color.rgb = lerp(Color.rgb, Color.rgb * SSSM.rgb,SubSurfaceToon_Intensity);
+		ShadowColor.rgb = lerp(ShadowColor.rgb, ShadowColor.rgb * SSSM.rgb, 0.5 * SubSurfaceToon_Intensity);
+		#endif
+	}
+	
+	ShadowColor *= Toon_Intensity;
+	
+//////////////////////////////////////////////////
+//Toon Mask
+
+	#if APPLY_TOON_MASK == 1
+	float2 ToonUV = mul( Eye, (float3x3)ViewMatrix ).xyz;
+	ToonUV.x = ToonUV.x * 0.5f + 0.5f;
+	ToonUV.y = ToonUV.y * -0.5f + 0.5f;
+	float4 ToonMask = tex2D(ToonMask_Sampler, ToonUV * ToonMask_Scale).a;
+	
+	ShadowColor  = lerp(ShadowColor - ToonMask, ToonMask_Intensity, ToonMask);
+	
+	#endif
+	
+//////////////////////////////////////////////////
+	
+	Color.rgb  = lerp(Color.rgb * ShadowColor.rgb, Color.rgb, ShadowComp);
+	ShadowComp -= (ShadowComp < 0.1) ? 1 : 0 ;
+	
+//////////////////////////////////////////////////
+	
+	#if APPLY_TONE_MAP == 1
+	Color.rgb += Brightness_Plus;
+	Color.rgb -= Brightness_Less;
+	Transparency = 1 + -Transparency;
+	float3 scene_tone		= ColorToneMapping(Color.rgb);
+	Color.rgb				= lerp(Color.rgb,scene_tone,Tone_Map_Intensity * Transparency);
+	#endif
+
+//////////////////////////////////////////////////
+        return Color;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Techniques
+technique MainTecBS0  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = false; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, false, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, false, false);
+    }
+}
+
+technique MainTecBS1  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = false; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, false, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, false, false);
+    }
+}
+
+technique MainTecBS2  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = true; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, true, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, true, false);
+    }
+}
+
+technique MainTecBS3  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = true; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, true, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, true, false);
+    }
+}
+
+// オブジェクト描画用テクニック（PMDモデル用）
+technique MainTecBS4  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = false; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, false, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, false, true);
+    }
+}
+
+technique MainTecBS5  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = false; bool UseToon = true; > {
+    pass DrawObject {
+		#if BLEND_APPLY == 1
+		
+		#if SRC_BLEND_TYPE == 0
+		SRCBLEND = ZERO;
+		#endif
+		#if SRC_BLEND_TYPE == 1
+		SRCBLEND = ONE;
+		#endif
+		#if SRC_BLEND_TYPE == 2
+		SRCBLEND = SrcColor;
+		#endif
+		#if SRC_BLEND_TYPE == 3
+		SRCBLEND = INVSrcColor;
+		#endif
+		#if SRC_BLEND_TYPE == 4
+		SRCBLEND = SrcAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 5
+		SRCBLEND = INVSrcAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 6
+		SRCBLEND = DestAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 7
+		SRCBLEND = INVDestAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 8
+		SRCBLEND = DestColor;
+		#endif
+		#if SRC_BLEND_TYPE == 9
+		SRCBLEND = INVDestColor;
+		#endif
+
+		#if DEST_BLEND_TYPE == 0
+		DESTBLEND = ZERO;
+		#endif
+		#if DEST_BLEND_TYPE == 1
+		DESTBLEND = ONE;
+		#endif
+		#if DEST_BLEND_TYPE == 2
+		DESTBLEND = SrcColor;
+		#endif
+		#if DEST_BLEND_TYPE == 3
+		DESTBLEND = INVSrcColor;
+		#endif
+		#if DEST_BLEND_TYPE == 4
+		DESTBLEND = SrcAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 5
+		DESTBLEND = INVSrcAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 6
+		DESTBLEND = DestAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 7
+		DESTBLEND = INVDestAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 8
+		DESTBLEND = DestColor;
+		#endif
+		#if DEST_BLEND_TYPE == 9
+		DESTBLEND = INVDestColor;
+		#endif
+		
+		#endif
+
+		#if ALPHA_BLEND_APPLY == 1
+		
+		#if ALPHA_BLEND_TYPE == 1
+		ALPHABLENDENABLE = FALSE;
+		#endif
+		
+		#if ALPHA_BLEND_TYPE == 2
+		ALPHABLENDENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if ALPHA_TEST_APPLY == 1
+		
+		#if ALPHA_TEST_TYPE == 1
+		ALPHATESTENABLE = FALSE;
+		#endif
+
+		#if ALPHA_TEST_TYPE == 2
+		ALPHATESTENABLE = TRUE;
+		#endif
+
+		#endif
+		
+		#if Z_WRITE_APPLY == 1
+		
+		#if Z_WRITE_TYPE == 1
+		ZWRITEENABLE = FALSE;
+		#endif
+		
+		#if Z_WRITE_TYPE == 2
+		ZWRITEENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if Z_ENABLE_APPLY == 1
+		
+		#if Z_TYPE == 1
+		ZENABLE = FALSE;
+		#endif
+		
+		#if Z_TYPE == 2
+		ZENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if CULLMODE_APPLY == 1
+		
+		#if CULLMODE_TYPE == 0
+		CULLMODE = NONE;
+		#endif
+		
+		#if CULLMODE_TYPE == 1
+		CULLMODE = CW;
+		#endif
+		
+		#if CULLMODE_TYPE == 2
+		CULLMODE = CCW;
+		#endif
+		
+		#endif
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, false, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, false, true);
+    }
+}
+
+technique MainTecBS6  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = true; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, true, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, true, true);
+    }
+}
+
+technique MainTecBS7  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = true; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, true, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, true, true);
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////

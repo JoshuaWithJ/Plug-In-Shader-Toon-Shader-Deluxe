@@ -1,0 +1,486 @@
+////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//
+// - Plug-In Shader - by Joshua: SSS Sampler
+// Base Shader: Simple Soft Shader by BeanManP
+// 
+//
+////////////////////////////////////////////////////////////////////////////////////////////////
+//Samplers
+
+// Object Texture
+texture ObjectTexture: MATERIALTEXTURE;
+sampler ObjTexSampler = sampler_state {
+    texture = <ObjectTexture>;
+    FILTER= ANISOTROPIC;
+    AddressU  = WRAP;
+    AddressV  = WRAP;
+};
+
+#if APPLY_IBL == 1
+//IBL
+textureCUBE IBLMap  <
+    string ResourceName = IBL_Texture
+    string Format = "A16B16G16R16F";>;
+sampler IBLSampler = sampler_state {
+    Texture = <IBLMap>;
+    MINFILTER = LINEAR;
+    MAGFILTER = LINEAR;
+    MIPFILTER = POINT;
+    ADDRESSU  = CLAMP;
+    ADDRESSV  = CLAMP;
+    ADDRESSW  = CLAMP;
+};
+
+#endif
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Sequence of transformations
+float4x4 WorldViewProjMatrix		: WORLDVIEWPROJECTION;
+float4x4 WorldViewMatrix			: WORLDVIEW;
+float4x4 WorldMatrix				: WORLD;
+float4x4 ViewMatrix					: VIEW;
+float4x4 LightWorldViewProjMatrix	: WORLDVIEWPROJECTION < string Object = "Light"; >;
+
+float3   LightDirection    : DIRECTION < string Object = "Light"; >;
+float3   CameraPosition    : POSITION  < string Object = "Camera"; >;
+
+// Material color
+float4	MaterialDiffuse		: DIFFUSE
+<
+string Object = "Geometry";
+   string UIWidget = "Numeric";
+   bool UIVisible =  true;
+   int UIMin = 0;
+   int UIMax = 1;
+>;
+float4	MaterialToon		: TOONCOLOR;
+
+bool     parthf;   // Perspective flag
+bool     transp;   // Semi-transparent flag
+bool	 spadd;    // Sphere map additive composition flag
+
+#define SKII1	1500
+#define SKII2	8000
+#define Toon	Toon_Gradient
+
+//HG Shadow
+#include "Resources/HgShadow_ObjHeader.fxh"
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+sampler DefSampler : register(s0);
+
+struct BufferShadow_INPUT {
+    float4 Pos      : POSITION; // Position
+    float3 Normal   : NORMAL; // Normal
+	float2 UV : TEXCOORD0;
+};
+
+struct BufferShadow_OUTPUT {
+	float4 Pos 		: POSITION;
+    float3 Normal   : NORMAL; // Normal
+	float2 UV : TEXCOORD0;
+    float4 ZCalcTex : TEXCOORD5; // ZCalcTex
+    float4 PPos		: TEXCOORD8; // Positon for HgShadow
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Vertex Shader
+BufferShadow_OUTPUT BufferShadow_VS(BufferShadow_INPUT IN, uniform bool useTexture, uniform bool useSphereMap, uniform bool useToon)
+{
+	BufferShadow_OUTPUT Out = (BufferShadow_OUTPUT)0;
+	// UV
+	Out.UV = IN.UV;
+	
+	// Vertex Normal
+	Out.Normal = normalize( mul( IN.Normal, (float3x3)WorldMatrix ) );
+	
+	// Shadow Projection
+	Out.ZCalcTex = mul( IN.Pos, LightWorldViewProjMatrix );
+	
+	// World view projective transformation from camera perspective
+	Out.Pos = mul( IN.Pos, WorldViewProjMatrix );
+	
+	// HgShadow
+	Out.PPos = Out.Pos;
+	
+	return Out;
+}
+//////////////////////////////////////////////////
+float3x3 Set_Rotation(float3 in_axis, float s, float c)
+{
+    float c_1 = 1.0f - c;
+	float3x3 in_m1 = 1;
+    float3 axis = normalize(in_axis);
+    float3 axis_s = axis * s;
+
+    float3 temp;
+    temp = axis * axis.x * c_1;
+    in_m1[0].x = temp.x + c;
+    in_m1[1].x = temp.y - axis_s.z;
+    in_m1[2].x = temp.z + axis_s.y;
+    temp = axis * axis.y * c_1;
+    in_m1[0].y = temp.x + axis_s.z;
+    in_m1[1].y = temp.y + c;
+    in_m1[2].y = temp.z - axis_s.x;
+    temp = axis * axis.z * c_1;
+    in_m1[0].z = temp.x - axis_s.y;
+    in_m1[1].z = temp.y + axis_s.x;
+    in_m1[2].z = temp.z + c;
+	return in_m1;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////
+// Pixel Shader
+float4 BufferShadow_PS(BufferShadow_OUTPUT IN, uniform bool useTexture, uniform bool useSphereMap, uniform bool useToon) : COLOR
+{
+//////////////////////////////////////////////////
+// Inputs
+//////////////////////////////////////////////////
+	float3 Normal		= normalize(IN.Normal);
+//////////////////////////////////////////////////
+    float4 Color		= 1;
+	float4 TexColor		= tex2D( ObjTexSampler, IN.UV );
+    float4 ShadowColor	= Shadow_Color;
+
+//////////////////////////////////////////////////
+	
+	float3x3 RotationTransform;
+	
+	float length1 = length(LightDirection.xyz * float3(-1, 1, -1));
+    if (length1 >= 0.000001f) {
+        float3 cube_direction = (LightDirection.xyz * float3(-1, 1, -1)) * (1.0f / length1);
+
+		float3 Posi = float3(0, 1, 0);
+        length1 = length(Posi.xyz);
+        if (length1 >= 0.000001f) {
+            float3 position = Posi * (1.0f / length1);
+		
+			float3 axis = cross(cube_direction, position);
+            length1 = length(axis.xyz);
+
+            float v52 = dot(cube_direction, position);
+            float angle = abs(atan2(length1, v52));
+			
+			if (angle >= 0.01f && angle <= 3.131592653589793f) {
+                if (length1 != 0.0f)
+                    axis *= 1.0f / length1;
+				
+			RotationTransform =  Set_Rotation(axis, sin(-angle), cos(-angle));
+			}
+		}
+	}
+
+//////////////////////////////////////////////////
+// IBL
+
+	#if APPLY_IBL == 1
+	
+	#if APPLY_IBL_LIGHT_DIRECTION == 0
+	float3 IBLPos = Normal;
+	#endif
+	
+	#if APPLY_IBL_LIGHT_DIRECTION == 1
+    float IBLrot_x = radians(45);
+    float IBLrot_y = radians(-45);
+    float IBLrot_z = radians(0);
+	float3x3 IBLRotationX = {
+	    {1,	0,	0},
+	    {0, cos(IBLrot_x), sin(IBLrot_x)},
+	    {0, -sin(IBLrot_x), cos(IBLrot_x)},
+	};
+	float3x3 IBLRotationY = {
+	    {cos(IBLrot_y), 0, -sin(IBLrot_y)},
+	    {0, 1, 0},
+		{sin(IBLrot_y), 0,cos(IBLrot_y)},
+	    };
+	float3x3 IBLRotationZ = {
+	    {cos(IBLrot_z), sin(IBLrot_z), 0},
+	    {-sin(IBLrot_z), cos(IBLrot_z), 0},
+	    {0, 0, 1},
+	};
+	float3x3 IBLRot = RotationTransform;
+    IBLRot = mul( IBLRot, IBLRotationX );
+    IBLRot = mul( IBLRot, IBLRotationY );
+    IBLRot = mul( IBLRot, IBLRotationZ );
+	float3 IBLPos = mul(Normal, (float3x3)IBLRot);
+	#endif
+	
+	float4 IBL = texCUBElod(IBLSampler, float4(1 + IBLPos, 0)) * IBL_Brightness;
+	
+	Color.rgb = lerp(Color.rgb, Color.rgb * IBL.rgb,IBL_Intensity);
+	
+	#endif
+
+	
+//////////////////////////////////////////////////
+//Shadow
+//////////////////////////////////////////////////
+    // Convert to texture coordinates
+    IN.ZCalcTex /= IN.ZCalcTex.w;
+    float2 TransTexCoord;
+    TransTexCoord.x = (1.0f + IN.ZCalcTex.x)*0.5f;
+    TransTexCoord.y = (1.0f - IN.ZCalcTex.y)*0.5f;
+    
+		if( any( saturate(TransTexCoord) != TransTexCoord ) ) {
+        return Color;
+		} else {
+        float ShadowComp = 0;
+		float U = SoftShadowParam / SHADOWMAP_SIZE;
+		float V = SoftShadowParam / SHADOWMAP_SIZE;
+        if(parthf) {
+            // セルフシャドウ mode2
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,0)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,0)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,0)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,-V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,-V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,-V)).r , 0.0f)*SKII2*TransTexCoord.y-0.3f);
+        } else {
+            // セルフシャドウ mode1
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,0)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,0)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,0)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(0,-V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(-U,-V)).r , 0.0f)*SKII1-0.3f);
+	        ShadowComp += saturate(max(IN.ZCalcTex.z-tex2D(DefSampler,TransTexCoord+float2(U,-V)).r , 0.0f)*SKII1-0.3f);
+        }
+        float LightNormal = dot(normalize(Normal), -LightDirection);
+		
+        float SHADSmooth = smoothstep(0.0, Toon_Smooth, 1);
+        LightNormal = SHADSmooth * LightNormal;
+		
+        ShadowComp = 1-saturate(ShadowComp/9);
+		ShadowComp = min(saturate(LightNormal * Toon), ShadowComp);
+
+//////////////////////////////////////////////////
+	if(HgShadow_Valid)
+	{
+        float comp = HgShadow_GetSelfShadowRate(IN.PPos);
+        if ( useToon ) 
+		{
+         comp = min(saturate(LightNormal * Toon), comp);
+	     ShadowComp = comp;
+		}
+	}
+
+//////////////////////////////////////////////////
+
+	#if SHADER_TYPE == 1
+	float3 HalfLambert = min(pow(dot(Normal, -LightDirection) * 0.5 + 0.5, 2) * 0.5 + 0.5, (1,1,ShadowComp));
+	HalfLambert = pow(HalfLambert * 0.5 + 0.5, 1.0) * (HalfLambert.rgb = pow(HalfLambert, ShadowColor.rgb * HalfLambert * 0.5 + 0.5));
+	
+	ShadowComp = HalfLambert;
+	#endif
+
+//////////////////////////////////////////////////
+	
+	ShadowColor.rgb *= Toon_Intensity;
+	
+	Color.rgb  = lerp(Color.rgb * ShadowColor.rgb, Color.rgb, ShadowComp);
+	
+	Color.a *= normalize(MaterialDiffuse.a * TexColor.a);
+	
+	clip(Color.a < 0.5 ? -1:1);
+
+//////////////////////////////////////////////////
+        return Color;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Techniques
+technique MainTecBS0  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = false; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, false, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, false, false);
+    }
+}
+
+technique MainTecBS1  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = false; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, false, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, false, false);
+    }
+}
+
+technique MainTecBS2  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = true; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, true, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, true, false);
+    }
+}
+
+technique MainTecBS3  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = true; bool UseToon = false; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, true, false);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, true, false);
+    }
+}
+
+// オブジェクト描画用テクニック（PMDモデル用）
+technique MainTecBS4  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = false; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, false, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, false, true);
+    }
+}
+
+technique MainTecBS5  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = false; bool UseToon = true; > {
+    pass DrawObject {
+		#if BLEND_APPLY == 1
+		
+		#if SRC_BLEND_TYPE == 0
+		SRCBLEND = ZERO;
+		#endif
+		#if SRC_BLEND_TYPE == 1
+		SRCBLEND = ONE;
+		#endif
+		#if SRC_BLEND_TYPE == 2
+		SRCBLEND = SrcColor;
+		#endif
+		#if SRC_BLEND_TYPE == 3
+		SRCBLEND = INVSrcColor;
+		#endif
+		#if SRC_BLEND_TYPE == 4
+		SRCBLEND = SrcAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 5
+		SRCBLEND = INVSrcAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 6
+		SRCBLEND = DestAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 7
+		SRCBLEND = INVDestAlpha;
+		#endif
+		#if SRC_BLEND_TYPE == 8
+		SRCBLEND = DestColor;
+		#endif
+		#if SRC_BLEND_TYPE == 9
+		SRCBLEND = INVDestColor;
+		#endif
+
+		#if DEST_BLEND_TYPE == 0
+		DESTBLEND = ZERO;
+		#endif
+		#if DEST_BLEND_TYPE == 1
+		DESTBLEND = ONE;
+		#endif
+		#if DEST_BLEND_TYPE == 2
+		DESTBLEND = SrcColor;
+		#endif
+		#if DEST_BLEND_TYPE == 3
+		DESTBLEND = INVSrcColor;
+		#endif
+		#if DEST_BLEND_TYPE == 4
+		DESTBLEND = SrcAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 5
+		DESTBLEND = INVSrcAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 6
+		DESTBLEND = DestAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 7
+		DESTBLEND = INVDestAlpha;
+		#endif
+		#if DEST_BLEND_TYPE == 8
+		DESTBLEND = DestColor;
+		#endif
+		#if DEST_BLEND_TYPE == 9
+		DESTBLEND = INVDestColor;
+		#endif
+		
+		#endif
+
+		#if ALPHA_BLEND_APPLY == 1
+		
+		#if ALPHA_BLEND_TYPE == 1
+		ALPHABLENDENABLE = FALSE;
+		#endif
+		
+		#if ALPHA_BLEND_TYPE == 2
+		ALPHABLENDENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if ALPHA_TEST_APPLY == 1
+		
+		#if ALPHA_TEST_TYPE == 1
+		ALPHATESTENABLE = FALSE;
+		#endif
+
+		#if ALPHA_TEST_TYPE == 2
+		ALPHATESTENABLE = TRUE;
+		#endif
+
+		#endif
+		
+		#if Z_WRITE_APPLY == 1
+		
+		#if Z_WRITE_TYPE == 1
+		ZWRITEENABLE = FALSE;
+		#endif
+		
+		#if Z_WRITE_TYPE == 2
+		ZWRITEENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if Z_ENABLE_APPLY == 1
+		
+		#if Z_TYPE == 1
+		ZENABLE = FALSE;
+		#endif
+		
+		#if Z_TYPE == 2
+		ZENABLE = TRUE;
+		#endif
+		
+		#endif
+		
+		#if CULLMODE_APPLY == 1
+		
+		#if CULLMODE_TYPE == 0
+		CULLMODE = NONE;
+		#endif
+		
+		#if CULLMODE_TYPE == 1
+		CULLMODE = CW;
+		#endif
+		
+		#if CULLMODE_TYPE == 2
+		CULLMODE = CCW;
+		#endif
+		
+		#endif
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, false, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, false, true);
+    }
+}
+
+technique MainTecBS6  < string MMDPass = "object_ss"; bool UseTexture = false; bool UseSphereMap = true; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(false, true, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(false, true, true);
+    }
+}
+
+technique MainTecBS7  < string MMDPass = "object_ss"; bool UseTexture = true; bool UseSphereMap = true; bool UseToon = true; > {
+    pass DrawObject {
+        VertexShader = compile vs_3_0 BufferShadow_VS(true, true, true);
+        PixelShader  = compile ps_3_0 BufferShadow_PS(true, true, true);
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////
